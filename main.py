@@ -1,8 +1,6 @@
 from dotenv import load_dotenv
 import os
 
-import base64
-
 import requests
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
@@ -25,9 +23,10 @@ SCOPES = [
 ]
 
 
-def getEncodedSKey() -> bytes:
-    load_dotenv()
-    return base64.b64encode(os.getenv("SECRET_KEY").encode())
+def getSKey() -> (str|None):
+    if load_dotenv() and (os.getenv("SECRET_KEY") is not None):
+        return os.getenv("SECRET_KEY")
+    raise FileNotFoundError("Missing .env file with SECRET_KEY variable")
 
 
 def getOAuth(cache_handler) -> SpotifyOAuth:
@@ -47,8 +46,9 @@ def getOAuth(cache_handler) -> SpotifyOAuth:
 
 
 app = flask.Flask(__name__)
-# store user access token in app session
-app.config["SECRET_KEY"] = getEncodedSKey().decode()
+# store user access token in app session, encrypted with secret key
+app.config["SECRET_KEY"] = getSKey()
+# session stores data for user as they move from page to page
 cache_handler = FlaskSessionCacheHandler(flask.session)
 sp_oauth = getOAuth(cache_handler)
 sp = Spotify(auth_manager=sp_oauth)
@@ -62,14 +62,18 @@ def home():
         auth_url = sp_oauth.get_authorize_url()
         return flask.redirect(auth_url)
     # if valid, redirect to endpoint for method get_playlists
-    return flask.redirect(flask.url_for("get_playlists"))
+    # return flask.redirect(flask.url_for("get_playlists"))
+    user = sp.current_user()
+    return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
 
 
 @app.route("/callback")
 def callback():
     # get 'code' once the authorization is done to store access token in authentication manager
     sp_oauth.get_access_token(flask.request.args["code"])
-    return flask.redirect(flask.url_for("get_playlists"))
+    # return flask.redirect(flask.url_for("get_playlists"))
+    user = sp.current_user()
+    return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
 
 
 @app.route("/get_playlists")
@@ -80,13 +84,41 @@ def get_playlists():
         return flask.redirect(auth_url)
 
     playlists = sp.current_user_playlists()
+    
+    if playlists:
+        playlists_info = [
+            (pl["name"], pl["external_urls"]["spotify"]) for pl in playlists["items"]
+        ]
+        playlists_html = "<br>".join([f"{name}: {url}" for name, url in playlists_info])
 
-    playlists_info = [
-        (pl["name"], pl["external_urls"]["spotify"]) for pl in playlists["items"]
-    ]
-    playlists_html = "<br>".join([f"{name}: {url}" for name, url in playlists_info])
+        return playlists_html
 
-    return playlists_html
+
+# instead of get playlists, have it go to the url of '/get_playlists' and only populate if they are logged in
+# from there they can click on a playlist to get recommendations and it sends them to
+# '/playlist/recommendations
+@app.route("/<username>/playlists")
+def user_select_playlist(username):
+    # make sure token is still valid
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        auth_url = sp_oauth.get_authorize_url()
+        return flask.redirect(auth_url)
+    
+    # if this is not user's profile, redirect them
+    user = sp.current_user()
+    if user and user["id"] == username:
+        playlists = sp.current_user_playlists()
+    
+        if playlists:
+            playlists_info = [
+                (pl["name"], pl["external_urls"]["spotify"]) for pl in playlists["items"]
+            ]
+            playlists_html = "<br>".join([f"{name}: {url}" for name, url in playlists_info])
+
+            return playlists_html
+        
+    # redirect to correct profile
+    return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
 
 
 @app.route("/logout")
