@@ -8,10 +8,10 @@
                                 My GitHub
                             </a>
                         </div>
-                        <a href="{{ url_for('login') }}" target="_blank" rel="noreferrer noopener"
+                        <a href="{{ user['external_urls']['spotify'] }}" target="_blank" rel="noreferrer noopener"
                             class="navbar-link2">
                             <div class="navbar-get-started1 get-started">
-                                <span class="navbar-text1">Get started</span>
+                                <span class="navbar-text1">Spotify</span>
                             </div>
                         </a>
                         <div id="open-mobile-menu" class="navbar-hamburger get-started">
@@ -38,9 +38,9 @@
                             </a>
                         </div>
                         <div class="get-started">
-                            <a href="{{ url_for('login') }}" target="_blank" rel="noreferrer noopener"
+                            <a href="{{ user['external_urls']['spotify'] }}" target="_blank" rel="noreferrer noopener"
                                 class="navbar-text2 nav-link">
-                                Get Started
+                                Spotify
                             </a>
                         </div>
                     </div>
@@ -96,34 +96,8 @@
 
 {% block home_content %}
                 <div class="home-hero">
-                    <div class="home-content">
-                        <main class="home-main">
-                            <header class="home-header">
-                                <h1 class="home-heading">Spotify Song Recommender</h1>
-                                <span class="home-caption">
-                                    CIST 5B Midterm Project: Use data structures to blah blah
-                                    blah
-                                </span>
-                            </header>
-                            <div class="home-buttons">
-                                <a href="{{ url_for('login') }}" target="_blank" rel="noreferrer noopener"
-                                    class="home-link">
-                                    <div class="home-get-started button">
-                                        <span class="home-text">Get started</span>
-                                    </div>
-                                </a>
-                            </div>
-                        </main>
-                    </div>
-                    <div class="home-image1">
-                        <img alt="Spotify playlist screenshot"
-                            src="{{url_for('static', filename='SectionImages/image_2025-04-04_215650161-1500h.png')}}"
-                            class="home-image2" />
-                    </div>
-                    <div class="home-image3">
-                        <img alt="Spotify playlist screenshot"
-                            src="{{url_for('static', filename='SectionImages/image_2025-04-04_215650161-1500h.png')}}"
-                            class="home-image4" />
-                    </div>
+                    <span class="home-caption">
+                        Gonna select the playlists in here
+                    </span>
                 </div>
 {% endblock %}

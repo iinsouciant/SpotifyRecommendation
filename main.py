@@ -103,7 +103,7 @@ def get_playlists():
 # '/playlist/recommendations
 # sp.current_user() returns dict with keys 
 #   'display_name'
-#   'external_urls' to go to profile e.g. 'https://open.spotify.com/user/insouciiant'
+#   'external_urls' e.g. {'spotify': 'https://open.spotify.com/user/insouciiant'}
 #   'followers' with dict of follower data
 #   'href' for api? e.g. 'https://api.spotify.com/v1/users/insouciiant'
 #   'id' 
@@ -114,21 +114,14 @@ def get_playlists():
 def user_select_playlist(username):
     # make sure token is still valid
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        auth_url = sp_oauth.get_authorize_url()
-        return flask.redirect(auth_url)
+        return flask.redirect(flask.url_for("login"))
     
     # if this is not user's profile, redirect them
     user = sp.current_user()
     if user and user["id"] == username:
         playlists = sp.current_user_playlists()
     
-        if playlists:
-            playlists_info = [
-                (pl["name"], pl["external_urls"]["spotify"]) for pl in playlists["items"]
-            ]
-            playlists_html = "<br>".join([f"{name}: {url}" for name, url in playlists_info])
-
-            return playlists_html
+        return flask.render_template("playlist_select.html",user=sp.current_user())
         
     # redirect to correct profile
     return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
@@ -141,7 +134,7 @@ def display_playist_recommendsations(username, playlist):
     # pull m songs w/ j plays, uploaded in last 2 years, and include at least 2 of the first two tags
 
     # placeholder, show 10 songs from bottom of playlist
-    return flask.render_template("base.html")
+    return flask.render_template("index.html")
 
 
 @app.route("/logout")
