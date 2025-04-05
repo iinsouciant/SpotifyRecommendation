@@ -8,6 +8,7 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 
 # for webapps, microframework
 import flask
+from markupsafe import escape
 
 # https://www.youtube.com/watch?v=2if5xSaZJlg for getting user playlists
 # need to use authorization code flow to allow user to log in once and refresh token https://spotipy.readthedocs.io/en/2.25.1/#authorization-code-flow
@@ -57,12 +58,15 @@ sp = Spotify(auth_manager=sp_oauth)
 # first endpoint. want user to see this when they access
 @app.route("/")
 def home():
-    # is_valid_token()
+    return flask.render_template("index.html")
+
+
+@app.route("/login")
+def login():
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         auth_url = sp_oauth.get_authorize_url()
         return flask.redirect(auth_url)
-    # if valid, redirect to endpoint for method get_playlists
-    # return flask.redirect(flask.url_for("get_playlists"))
+    # if valid, redirect to endpoint for method to user selecting playlists
     user = sp.current_user()
     return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
 
@@ -97,6 +101,15 @@ def get_playlists():
 # instead of get playlists, have it go to the url of '/get_playlists' and only populate if they are logged in
 # from there they can click on a playlist to get recommendations and it sends them to
 # '/playlist/recommendations
+# sp.current_user() returns dict with keys 
+#   'display_name'
+#   'external_urls' to go to profile e.g. 'https://open.spotify.com/user/insouciiant'
+#   'followers' with dict of follower data
+#   'href' for api? e.g. 'https://api.spotify.com/v1/users/insouciiant'
+#   'id' 
+#   'images' for pfp data
+#   'type' for account type?
+#   'uri'
 @app.route("/<username>/playlists")
 def user_select_playlist(username):
     # make sure token is still valid
@@ -119,6 +132,16 @@ def user_select_playlist(username):
         
     # redirect to correct profile
     return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
+
+
+@app.route("/<username>/<playlist>/recommendations")
+def display_playist_recommendsations(username, playlist):
+    # pull from bottom of playlist up to n songs
+
+    # pull m songs w/ j plays, uploaded in last 2 years, and include at least 2 of the first two tags
+
+    # placeholder, show 10 songs from bottom of playlist
+    return flask.render_template("base.html")
 
 
 @app.route("/logout")
