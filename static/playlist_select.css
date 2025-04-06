@@ -233,6 +233,13 @@
   flex-direction: column;
 }
  
+.home-pl {
+  margin-bottom: var(--dl-layout-space-unit);
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+}
+ 
 .home-header {
   gap: var(--dl-layout-space-unit);
   display: flex;
@@ -249,6 +256,12 @@
 .home-caption {
   color: rgb(255, 255, 255);
   align-self: flex-start;
+}
+ 
+.home-list-major {
+  color: rgb(255, 255, 255);
+  align-self: flex-start;
+  font-size: 24px;
 }
  
 .home-list-text {
@@ -280,6 +293,20 @@
   font-family: Poppins;
   font-weight: 500;
   line-height: 24px;
+}
+
+.home-link-minor {
+  color: #fff;
+  font-size: 16px;
+  font-style: Medium;
+  text-align: left;
+  transition: 0.3s;
+  font-family: Poppins;
+  font-weight: 500;
+  line-height: normal;
+  font-stretch: normal;
+  text-decoration: none;
+  padding-bottom: var(--dl-layout-space-unit);
 }
  
 .home-image1 {

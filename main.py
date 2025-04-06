@@ -45,6 +45,8 @@ def getOAuth(cache_handler) -> SpotifyOAuth:
 
     return auth
 
+def sort_pls_name() -> list:
+    return []
 
 app = flask.Flask(__name__)
 # store user access token in app session, encrypted with secret key
@@ -123,18 +125,24 @@ def user_select_playlist(username):
         pls = []
         while True:
             playlists = sp.current_user_playlists(offset=50*n)
-            if len(playlists["items"]) == 0:
-                return flask.render_template("playlist_select.html",user=user,playlists=pls)
+            if len(playlists["items"]) == 0: # TODO have link go to 10 recommended songs page
+                break
             for pl in playlists["items"]:
-                pls.append((pl["name"], pl["external_urls"]["spotify"]))
+                if len(pl['name']) == 0:
+                    pl['name'] = "blank"
+                pls.append({'name':pl["name"], 'url':pl["external_urls"]["spotify"], 'id':pl['id']})
             n += 1
+
+        pls = sort_pls_name()
+
+        return flask.render_template("playlist_select.html",user=user,playlists=pls)
         
     # redirect to correct profile
     return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
 
 
-@app.route("/<username>/<playlist>/recommendations")
-def display_playist_recommendsations(username, playlist):
+@app.route("/<username>/<pl>/recommendations")
+def display_playlist_recommendations(username, pl):
     # pull from bottom of playlist up to n songs
 
     # pull m songs w/ j plays, uploaded in last 2 years, and include at least 2 of the first two tags

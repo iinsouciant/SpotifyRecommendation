@@ -103,16 +103,18 @@
                         <h1 class="home-heading">Choose a playlist</h1>
                     </header>
                     <div class="home-list">
-                        <!-- <main class="home-main">
-                            <header class="home-header"> -->
-                                {% for pl in playlists %}
-                                <a href="{{ pl[1] }}" target="_blank" rel="noreferrer noopener"
-                                    class="home-link nav-link">
-                                    <span class="home-list-text">{{ pl[0] }}</span>
-                                </a>
-                                {% endfor %}
-                            <!-- </header>
-                        </main> -->
+                        {% for pl in playlists %}
+                        <div class="home-pl">
+                            <a href="{{ url_for('display_playlist_recommendations',username=user['id'],pl=pl['id']) }}" target="_blank" rel="noreferrer noopener"
+                                class="home-link nav-link"> 
+                                <span class="home-list-major">{{ pl['name'] }}</span>
+                            </a>
+                            <a href="{{ pl['url'] }}" target="_blank" rel="noreferrer noopener"
+                                class="home-link nav-link"> 
+                                <span class="home-list-text">View in Spotify</span>
+                            </a>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </section>
