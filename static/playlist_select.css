@@ -14,7 +14,7 @@
   padding-top: var(--dl-layout-space-twounits);
   padding-left: var(--dl-layout-space-oneandhalfunits);
   padding-right: var(--dl-layout-space-oneandhalfunits);
-  padding-bottom: var(--dl-layout-space-fiveunits);
+  padding-bottom: var(--dl-layout-space-fourunits);
 }
  
 .navbar-branding-logo {
@@ -137,12 +137,12 @@
 
  
 @media(max-width: 767px) {
-  .navbar-navbar {
+  /* .navbar-navbar {
     padding-bottom: var(--dl-layout-space-fourunits);
   }
   .navbar-branding-logo {
     width: 80px;
-  }
+  } */
   .navbar-nav-links1 {
     display: none;
   }
@@ -182,7 +182,7 @@
  
 .home-section {
   width: 100%;
-  height: 80vh;
+  /* height: 80vh; */
   display: flex;
   align-items: center;
   border-color: #51515A;
@@ -191,15 +191,20 @@
   flex-direction: column;
   justify-content: center;
   border-bottom-width: 1px;
+  position: relative;
+  max-width: 1600px;
 }
  
 .home-hero {
+  gap: var(--dl-layout-space-fourunits);
+  flex: 1;
   width: 100%;
   display: flex;
   max-width: 1600px;
-  align-items: center;
-  flex-direction: row;
+  align-items: flex-start;
+  flex-direction: column;
   justify-content: space-between;
+  position: relative;
 }
  
 .home-content {
@@ -209,6 +214,16 @@
   max-width: 600px;
   align-items: flex-start;
   flex-direction: column;
+}
+ 
+.home-list {
+  gap: 0;
+  width: fit-content;
+  display: flex;
+  max-width: 600px;
+  align-items: flex-start;
+  flex-direction: column;
+  align-self: self-start;
 }
  
 .home-main {
@@ -227,11 +242,16 @@
  
 .home-heading {
   color: rgb(255, 255, 255);
-  width: 520px;
+  width: 600px;
   font-size: 64px;
 }
  
 .home-caption {
+  color: rgb(255, 255, 255);
+  align-self: flex-start;
+}
+ 
+.home-list-text {
   color: rgb(255, 255, 255);
   align-self: flex-start;
 }
@@ -293,17 +313,15 @@
 @media(max-width: 991px) {
   .home-section {
     height: auto;
-    padding-left: 0px;
+    /* padding-left: 0px; */
     padding-right: 0px;
   }
   .home-hero {
-    gap: var(--dl-layout-space-fourunits);
-    flex: 1;
-    position: relative;
+    /* position: relative; */
     max-width: auto;
-    align-items: center;
+    /* align-items: center;
     flex-direction: column;
-    justify-content: center;
+    justify-content: center; */
   }
   .home-content {
     position: relative;

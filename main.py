@@ -119,9 +119,15 @@ def user_select_playlist(username):
     # if this is not user's profile, redirect them
     user = sp.current_user()
     if user and user["id"] == username:
-        playlists = sp.current_user_playlists()
-    
-        return flask.render_template("playlist_select.html",user=sp.current_user())
+        n = 0
+        pls = []
+        while True:
+            playlists = sp.current_user_playlists(offset=50*n)
+            if len(playlists["items"]) == 0:
+                return flask.render_template("playlist_select.html",user=user,playlists=pls)
+            for pl in playlists["items"]:
+                pls.append((pl["name"], pl["external_urls"]["spotify"]))
+            n += 1
         
     # redirect to correct profile
     return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))

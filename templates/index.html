@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 
 {% block navbar_content %}
+                    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}" />
                     <div class="navbar-nav-content">
                         <div class="navbar-nav-links1">
                             <a href="https://github.com/iinsouciant" target="_blank" rel="noreferrer noopener"
@@ -37,12 +38,12 @@
                                 My GitHub
                             </a>
                         </div>
-                        <div class="get-started">
-                            <a href="{{ url_for('login') }}" target="_blank" rel="noreferrer noopener"
-                                class="navbar-text2 nav-link">
+                        <a href="{{ url_for('login') }}" target="_blank" rel="noreferrer noopener"
+                            class="navbar-text2 nav-link">
+                            <div class="get-started">
                                 Get Started
-                            </a>
-                        </div>
+                            </div>
+                        </a>
                     </div>
                     <div>
                         <div class="navbar-container3">
@@ -95,6 +96,7 @@
 {% endblock %}
 
 {% block home_content %}
+            <section class="home-section">
                 <div class="home-hero">
                     <div class="home-content">
                         <main class="home-main">
@@ -126,4 +128,5 @@
                             class="home-image4" />
                     </div>
                 </div>
+            </section>
 {% endblock %}

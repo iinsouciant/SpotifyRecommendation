@@ -278,4 +278,33 @@
       max-width: auto;
     }
   }
-  
+
+  .navbar-wrapper {
+    display: contents;
+  }
+   
+  .navbar-navbar {
+    width: 100%;
+    display: flex;
+    z-index: 1000;
+    position: relative;
+    max-width: 1600px;
+    align-self: auto;
+    align-items: center;
+    flex-shrink: 1;
+    padding-top: var(--dl-layout-space-twounits);
+    padding-left: var(--dl-layout-space-oneandhalfunits);
+    padding-right: var(--dl-layout-space-oneandhalfunits);
+    padding-bottom: var(--dl-layout-space-fiveunits);
+  }
+
+  .home-container {
+    width: 100%;
+    display: flex;
+    overflow: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    align-items: center;
+    flex-direction: column;
+    background-color: #0F0F0F;
+  }

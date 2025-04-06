@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 
 {% block navbar_content %}
+                    <link href="{{ url_for('static', filename='playlist_select.css') }}" rel="stylesheet" />
                     <div class="navbar-nav-content">
                         <div class="navbar-nav-links1">
                             <a href="https://github.com/iinsouciant" target="_blank" rel="noreferrer noopener"
@@ -37,12 +38,12 @@
                                 My GitHub
                             </a>
                         </div>
-                        <div class="get-started">
-                            <a href="{{ user['external_urls']['spotify'] }}" target="_blank" rel="noreferrer noopener"
-                                class="navbar-text2 nav-link">
+                        <a href="{{ user['external_urls']['spotify'] }}" target="_blank" rel="noreferrer noopener"
+                            class="navbar-text2 nav-link">
+                            <div class="get-started">
                                 Spotify
-                            </a>
-                        </div>
+                            </div>
+                        </a>
                     </div>
                     <div>
                         <div class="navbar-container3">
@@ -95,9 +96,24 @@
 {% endblock %}
 
 {% block home_content %}
+            <link href="{{ url_for('static', filename='playlist_select.css') }}" rel="stylesheet" />
+            <section class="home-section">
                 <div class="home-hero">
-                    <span class="home-caption">
-                        Gonna select the playlists in here
-                    </span>
+                    <header class="home-header">
+                        <h1 class="home-heading">Choose a playlist</h1>
+                    </header>
+                    <div class="home-list">
+                        <!-- <main class="home-main">
+                            <header class="home-header"> -->
+                                {% for pl in playlists %}
+                                <a href="{{ pl[1] }}" target="_blank" rel="noreferrer noopener"
+                                    class="home-link nav-link">
+                                    <span class="home-list-text">{{ pl[0] }}</span>
+                                </a>
+                                {% endfor %}
+                            <!-- </header>
+                        </main> -->
+                    </div>
                 </div>
+            </section>
 {% endblock %}

@@ -159,7 +159,6 @@
 <body>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
     <div>
-        <link href="{{ url_for('static', filename='playlist_select.css') }}" rel="stylesheet" />
 
         <div class="home-container">
             <navbar-wrapper class="navbar-wrapper" rootclassname="navbarundefined">
@@ -172,8 +171,7 @@
                     {% block navbar_content %}{% endblock %}
                 </header>
             </navbar-wrapper>
-            <section class="home-section">
-                {% block home_content %}{% endblock %}
+            {% block home_content %}{% endblock %}
             </section>
         </div>
     </div>
