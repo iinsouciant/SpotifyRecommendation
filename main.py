@@ -12,7 +12,7 @@ from markupsafe import escape
 
 from SinglyLinkedList import LinkedList
 
-from typing import Any
+from typing import Any, Generator
 
 # scopes of app https://developer.spotify.com/documentation/web-api/concepts/scopes
 SCOPES = [
@@ -22,6 +22,12 @@ SCOPES = [
     "playlist-modify-public",
     "user-library-read",
 ]
+
+# used for type hints for readability
+type Album = dict[str, str]
+type Song = dict[str, Album]
+type Songs = list[Song]
+type Playlists = list[str]
 
 
 class PlaylistLinkedList(LinkedList):
@@ -171,10 +177,9 @@ def get_playlists():
         return playlists_html"""
 
 """
-instead of get playlists, have it go to the url of '/get_playlists' and only populate if they are logged in
-from there they can click on a playlist to get recommendations and it sends them to
+user clicks on a playlist to get recommendations and it sends them to
 '/playlist/recommendations
-sp.current_user() returns dict with keys 
+sp.current_user() returns dict with keys https://developer.spotify.com/documentation/web-api/reference/get-track
   'display_name'
   'external_urls' e.g. {'spotify': 'https://open.spotify.com/user/insouciiant'}
   'followers' with dict of follower data
@@ -200,9 +205,10 @@ def user_select_playlist(username):
     
 
     offset = 0
+    lim = 50
     pls = PlaylistLinkedList()
     while True:
-        playlists = sp.current_user_playlists(offset=offset, limit=50)
+        playlists = sp.current_user_playlists(offset=offset, limit=lim)
         if len(playlists["items"]) == 0:
             break
         for pl in playlists["items"]:
@@ -215,7 +221,7 @@ def user_select_playlist(username):
                     "id": pl["id"],
                 }
             )
-        offset += 50
+        offset += lim
 
     pls.msort_pls_key(key="name")
 
@@ -223,43 +229,7 @@ def user_select_playlist(username):
 
 
 
-@app.route("/<username>/<pl>/recommendations")
-def display_playlist_recommendations(username, pl):
-    # pull from bottom of playlist up to n songs
-    songs = []
-    offset = 0
-    while offset < 501:
-        temp = sp.playlist_tracks(
-            pl,
-            fields="items(track(id, name, artists, album(id, name)))",
-            offset=offset,
-            limit=100
-        )
-
-        # if there are no more songs to get, items will be empty list
-        if len(temp["items"]) == 0:
-            break
-
-        for song in temp["items"]:
-            if len(song["name"]) == 0:
-                pl["name"] = "blank"
-            songs.append(
-                {
-                    "song": song["track"],
-                    "name": song["name"],
-                    "artists": song["artists"],
-                    "id": song["id"],
-                    "album": song["album"],
-                }
-            )
-        offset += 100
-    # can get song info w/ sp.audio_analysis(track_id) or sp.audio_features(tracks=[])
-
-    # check database to see if it was last updated today || is empty
-    # if so, then:
-    # pull m songs w/ j plays, uploaded in last 2 years, artist over 1 mil monthly, and ?? to limit number of uploads
-
-    # placeholder, show 10 songs from bottom of playlist
+    # I will adapt this approac by making a large list of songs from a handful of featured playlists and pulling them into one large list
     return flask.render_template("index.html")
 
 
