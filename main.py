@@ -10,7 +10,9 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 import flask
 from markupsafe import escape
 
-from SinglyLinkedList import LinkedList, Node
+from SinglyLinkedList import LinkedList
+
+from typing import Any
 
 # scopes of app https://developer.spotify.com/documentation/web-api/concepts/scopes
 SCOPES = [
@@ -20,6 +22,7 @@ SCOPES = [
     "playlist-modify-public",
     "user-library-read",
 ]
+
 
 class PlaylistLinkedList(LinkedList):
     # def append(self, val) -> None:
@@ -36,14 +39,13 @@ class PlaylistLinkedList(LinkedList):
         output += "None"
         return output
 
-
     def msort_pls_key(self, key) -> None:
-        """ Merge Sort algorithm adapted to Linked Lists according to the given key for each dict element"""
+        """Merge Sort algorithm adapted to Linked Lists according to the given key for each dict element"""
         # split then sort
         # split array in two until 1 element arrays, then compare first element of one array to another then merge
         # base case is if only one element, then we compare
         if len(self) <= 1:
-            return 
+            return
         else:
             mid = len(self) // 2
             left = PlaylistLinkedList()
@@ -87,13 +89,13 @@ class PlaylistLinkedList(LinkedList):
             self.head = result.head
 
 
-def getSKey() -> (str|None):
+def get_secret_key() -> str | None:
     if load_dotenv() and (os.getenv("SECRET_KEY") is not None):
         return os.getenv("SECRET_KEY")
     raise FileNotFoundError("Missing .env file with SECRET_KEY variable")
 
 
-def getOAuth(cache_handler) -> SpotifyOAuth:
+def get_oauth(cache_handler) -> SpotifyOAuth:
     # Create authentication manager for API with Authorization Code Flow
     load_dotenv()
     REDIRECT: str = "http://127.0.0.1:5000/callback"
@@ -109,12 +111,16 @@ def getOAuth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
+def getTrackDB() -> Any:
+    raise NotImplementedError
+
+
 app = flask.Flask(__name__)
 # store user access token in app session, encrypted with secret key
-app.config["SECRET_KEY"] = getSKey()
+app.config["SECRET_KEY"] = get_secret_key()
 # session stores data for user as they move from page to page
 cache_handler = FlaskSessionCacheHandler(flask.session)
-sp_oauth = getOAuth(cache_handler)
+sp_oauth = get_oauth(cache_handler)
 sp = Spotify(auth_manager=sp_oauth)
 
 
@@ -143,6 +149,7 @@ def callback():
     return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
 
 
+"""
 @app.route("/get_playlists")
 def get_playlists():
     # https://www.youtube.com/watch?v=2if5xSaZJlg for getting user playlists
@@ -161,7 +168,7 @@ def get_playlists():
         ]
         playlists_html = "<br>".join([f"{name}: {url}" for name, url in playlists_info])
 
-        return playlists_html
+        return playlists_html"""
 
 """
 instead of get playlists, have it go to the url of '/get_playlists' and only populate if they are logged in
@@ -177,40 +184,80 @@ sp.current_user() returns dict with keys
   'type' for account type?
   'uri'
 """
+
+
 @app.route("/<username>/playlists")
 def user_select_playlist(username):
     # make sure token is still valid
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         return flask.redirect(flask.url_for("login"))
-    
+
     # if this is not user's profile, redirect them
     user = sp.current_user()
-    if user and user["id"] == username:
-        n = 0
-        pls = PlaylistLinkedList()
-        while True:
-            playlists = sp.current_user_playlists(offset=50*n)
-            if len(playlists["items"]) == 0: # TODO have link go to 10 recommended songs page
-                break
-            for pl in playlists["items"]:
-                if len(pl['name']) == 0:
-                    pl['name'] = "blank"
-                pls.append({'name':pl["name"], 'url':pl["external_urls"]["spotify"], 'id':pl['id']})
-            n += 1
+    if not user or user["id"] != username:
+        # redirect to correct profile
+        return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
+    
 
-        pls.msort_pls_key(key='name')
+    offset = 0
+    pls = PlaylistLinkedList()
+    while True:
+        playlists = sp.current_user_playlists(offset=offset, limit=50)
+        if len(playlists["items"]) == 0:
+            break
+        for pl in playlists["items"]:
+            if len(pl["name"]) == 0:
+                pl["name"] = "blank"
+            pls.append(
+                {
+                    "name": pl["name"],
+                    "url": pl["external_urls"]["spotify"],
+                    "id": pl["id"],
+                }
+            )
+        offset += 50
 
-        return flask.render_template("playlist_select.html",user=user,playlists=pls)
-        
-    # redirect to correct profile
-    return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
+    pls.msort_pls_key(key="name")
+
+    return flask.render_template("playlist_select.html", user=user, playlists=pls)
+
 
 
 @app.route("/<username>/<pl>/recommendations")
 def display_playlist_recommendations(username, pl):
     # pull from bottom of playlist up to n songs
+    songs = []
+    offset = 0
+    while offset < 501:
+        temp = sp.playlist_tracks(
+            pl,
+            fields="items(track(id, name, artists, album(id, name)))",
+            offset=offset,
+            limit=100
+        )
 
-    # pull m songs w/ j plays, uploaded in last 2 years, and include at least 2 of the first two tags
+        # if there are no more songs to get, items will be empty list
+        if len(temp["items"]) == 0:
+            break
+
+        for song in temp["items"]:
+            if len(song["name"]) == 0:
+                pl["name"] = "blank"
+            songs.append(
+                {
+                    "song": song["track"],
+                    "name": song["name"],
+                    "artists": song["artists"],
+                    "id": song["id"],
+                    "album": song["album"],
+                }
+            )
+        offset += 100
+    # can get song info w/ sp.audio_analysis(track_id) or sp.audio_features(tracks=[])
+
+    # check database to see if it was last updated today || is empty
+    # if so, then:
+    # pull m songs w/ j plays, uploaded in last 2 years, artist over 1 mil monthly, and ?? to limit number of uploads
 
     # placeholder, show 10 songs from bottom of playlist
     return flask.render_template("index.html")
