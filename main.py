@@ -95,6 +95,15 @@ class PlaylistLinkedList(LinkedList):
             self.head = result.head
 
 
+class SongStack(LinkedStack):
+    def __init__(self, songs: Songs = []):
+        super().__init__()
+
+        if len(songs) > 0:
+            for song in songs:
+                self.push(song)
+
+
 def get_secret_key() -> str | None:
     if load_dotenv() and (os.getenv("SECRET_KEY") is not None):
         return os.getenv("SECRET_KEY")
@@ -116,9 +125,121 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
 
     return auth
 
+def get_songs(pl_id) -> Generator[Song]:
+    """ Generator to get each song from a playlist so that it can be put into different data structures"""
+    offset = 0
+    lim = 100
+    while offset < 501:
+        temp = sp.playlist_tracks(
+            pl_id,
+            fields="items(track(id, name, artists, album(id, name)))",
+            offset=offset,
+            limit=lim
+        )
 
-def getTrackDB() -> Any:
-    raise NotImplementedError
+        # if there are no more songs to get, items will be empty list
+        if len(temp["items"]) == 0:
+            offset = 502
+            break
+
+        for song in temp["items"]:
+            song = song['track']
+            if len(song["name"]) == 0:
+                song["name"] = "blank"
+            songDict: Song = {
+                    "name": song["name"],
+                    "artists": song["artists"],
+                    "id": song["id"],
+                    "album": song["album"],
+                }
+            # optional song data shown from https://github.com/obielin/Music-recommendation-System/blob/main/spotify_recommendation_system.py
+            # maybe build off of later
+            """
+            try:
+                # Get audio features for the track
+                audio_features = sp.audio_features(track_id)[0] if track_id != 'Not available' else None
+
+                # Get release date of the album
+                try:
+                    album_info = sp.album(album_id) if album_id != 'Not available' else None
+                    release_date = album_info['release_date'] if album_info else None
+                except:
+                    release_date = None
+
+                # Get popularity of the track
+                try:
+                    track_info = sp.track(track_id) if track_id != 'Not available' else None
+                    popularity = track_info['popularity'] if track_info else None
+                except:
+                    popularity = None
+
+                # Add additional track information to the track data
+                track_data = {
+                    'Track Name': track_name,
+                    'Artists': artists,
+                    'Album Name': album_name,
+                    'Album ID': album_id,
+                    'Track ID': track_id,
+                    'Popularity': popularity,
+                    'Release Date': release_date,
+                    'Duration (ms)': audio_features['duration_ms'] if audio_features else None,
+                    'Explicit': track_info.get('explicit', None),
+                    'External URLs': track_info.get('external_urls', {}).get('spotify', None),
+                    'Danceability': audio_features['danceability'] if audio_features else None,
+                    'Energy': audio_features['energy'] if audio_features else None,
+                    'Key': audio_features['key'] if audio_features else None,
+                    'Loudness': audio_features['loudness'] if audio_features else None,
+                    'Mode': audio_features['mode'] if audio_features else None,
+                    'Speechiness': audio_features['speechiness'] if audio_features else None,
+                    'Acousticness': audio_features['acousticness'] if audio_features else None,
+                    'Instrumentalness': audio_features['instrumentalness'] if audio_features else None,
+                    'Liveness': audio_features['liveness'] if audio_features else None,
+                    'Valence': audio_features['valence'] if audio_features else None,
+                    'Tempo': audio_features['tempo'] if audio_features else None,
+                    # Add more attributes as needed
+                }
+                songDict['data'] = track_data
+            """
+            yield songDict
+        offset += lim
+
+
+def get_pl_stack(pl_id) -> SongStack:
+    " For feeding last in to the recommendation system"
+    songs = SongStack()
+    for song in get_songs(pl_id):
+        songs.push(song)
+    return songs
+
+
+def get_pl_list(pl_id) -> Songs:
+    """ For compiling song data into large set to get recommendations from"""
+    return [song for song in get_songs(pl_id)]
+
+
+def get_ft_pls(n: int =  20) -> Playlists:
+    """ Get n featured playlist IDs to be used with get_pl_list() """
+    pls = []
+    offset = 0
+    lim = 50
+    while offset < n:
+        # gives 404 error. deprecated? https://developer.spotify.com/documentation/web-api/reference/get-featured-playlists
+        temp = sp.featured_playlists(
+            limit=lim,
+            offset=offset,
+            timestamp=None
+        )
+
+        # if there are no more playlists to get, items will be empty list
+        if len(temp["items"]) == 0:
+            return pls
+        
+        for pl in temp:
+            pls.append(pl['id'])
+
+        offset += lim
+
+    return pls
 
 
 app = flask.Flask(__name__)
