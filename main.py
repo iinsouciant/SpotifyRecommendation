@@ -11,6 +11,7 @@ import flask
 from markupsafe import escape
 
 from SinglyLinkedList import LinkedList
+from Stack import LinkedStack
 
 from typing import Any, Generator
 
@@ -153,7 +154,7 @@ def get_songs(pl_id) -> Generator[Song]:
                     "album": song["album"],
                 }
             # optional song data shown from https://github.com/obielin/Music-recommendation-System/blob/main/spotify_recommendation_system.py
-            # maybe build off of later
+            # maybe build off of later? NVM this is deprecated along with getting recommendations()
             """
             try:
                 # Get audio features for the track
@@ -218,17 +219,56 @@ def get_pl_list(pl_id) -> Songs:
 
 
 def get_ft_pls(n: int =  20) -> Playlists:
-    """ Get n featured playlist IDs to be used with get_pl_list() """
+    """ Get n featured playlist IDs to be used with get_pl_list() 
+    This approach will not work as the get-featured-playlists endpoint is now
+    deprecated and cannot be accessed. Always gives 404 Error"""
     pls = []
     offset = 0
     lim = 50
     while offset < n:
         # gives 404 error. deprecated? https://developer.spotify.com/documentation/web-api/reference/get-featured-playlists
-        temp = sp.featured_playlists(
-            limit=lim,
-            offset=offset,
-            timestamp=None
-        )
+        # temp = sp.featured_playlists(
+        #     limit=lim,
+        #     offset=offset,
+        #     timestamp=None
+        # )
+        # 100% deprecated, not able to access https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
+        # a = requests.get(
+        #     url='https://api.spotify.com/v1/browse/featured-playlists',
+        #     headers={'Authorization': f"Bearer {cache_handler.get_cached_token()['access_token']}"}
+        # )
+
+        # if there are no more playlists to get, items will be empty list
+        if len(temp["items"]) == 0:
+            return pls
+        
+        for pl in temp:
+            pls.append(pl['id'])
+
+        offset += lim
+
+    return pls
+
+
+def get_top_pls(n: int =  20) -> Playlists:
+    """ Get n featured playlist IDs to be used with get_pl_list() 
+    This approach will not work as the get-featured-playlists endpoint is now
+    deprecated and cannot be accessed. Always gives 404 Error"""
+    pls = []
+    offset = 0
+    lim = 50
+    while offset < n:
+        # gives 404 error. deprecated? https://developer.spotify.com/documentation/web-api/reference/get-featured-playlists
+        # temp = sp.featured_playlists(
+        #     limit=lim,
+        #     offset=offset,
+        #     timestamp=None
+        # )
+        # 100% deprecated, not able to access https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
+        # a = requests.get(
+        #     url='https://api.spotify.com/v1/browse/featured-playlists',
+        #     headers={'Authorization': f"Bearer {cache_handler.get_cached_token()['access_token']}"}
+        # )
 
         # if there are no more playlists to get, items will be empty list
         if len(temp["items"]) == 0:
@@ -350,6 +390,27 @@ def user_select_playlist(username):
 
 
 
+@app.route("/<username>/<pl_id>/recommendations")
+def display_playlist_recommendations(username, pl_id):
+    # make sure token is still valid
+    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+        return flask.redirect(flask.url_for("login"))
+
+    # songs to feed in to recommendation system
+    selected_songs = get_pl_stack(pl_id)
+    # pull from ?? featured playlists and start getting scores for each track
+    """ note for final report: debated with how to quickly get a bunch of potentially viable songs
+     while considering difficulty and memory space. 
+     considered pulling daily and adding to SQL db but would increase complexity and running out of time
+     even if it may save time trying to pull from API each time.
+     Looking through available methods, will be easier to pull from some featured playlists.
+    """
+    dataset = []
+    for pl_id in get_ft_pls():
+        for song in get_songs(pl_id):
+            dataset.append(song)
+    #looking at the approach by Linda, they had a playlist of songs (presumably some trending playlist)
+    # then the user would feed in a song name in that playlist and get out n most similar songs weighted by recency
     # I will adapt this approac by making a large list of songs from a handful of featured playlists and pulling them into one large list
     return flask.render_template("index.html")
 
