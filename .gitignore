@@ -1,3 +1,4 @@
 .env
 examples/
 *.sql
+__pycache__
