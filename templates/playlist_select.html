@@ -105,7 +105,7 @@
                     <div class="home-list">
                         {% for pl in playlists %}
                         <div class="home-pl">
-                            <a href="{{ url_for('display_playlist_recommendations',username=user['id'],pl=pl['id']) }}" target="_blank" rel="noreferrer noopener"
+                            <a href="{{ url_for('display_playlist_recommendations',username=user['id'],pl_id=pl['id']) }}" target="_blank" rel="noreferrer noopener"
                                 class="home-link nav-link"> 
                                 <span class="home-list-major">{{ pl['name'] }}</span>
                             </a>
