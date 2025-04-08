@@ -129,9 +129,10 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
-def get_song_lyrics(song: Song):
+def get_song_lyrics(song: Song) -> str:
     """
     Use spotify song data to look up lyrics from LRCLIB API. 
+    This API takes up most of the time required to get response back to user.
     Instead of using Spotify's deprecated song features endpoint,
     pivoting to semantic search lyrics. If time allows, try to pull in tempo and give score for closeness.
     https://lrclib.net/docs
@@ -141,14 +142,29 @@ def get_song_lyrics(song: Song):
     Example GET:
     GET /api/get?artist_name=Borislav+Slavov&track_name=I+Want+to+Live&album_name=Baldur%27s+Gate+3+(Original+Game+Soundtrack)&duration=233
 
-    "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
     """
     artist = quote_plus(song['artists'][0]['name'])
+    track = quote_plus(song['name'])
+    album = quote_plus(song['album'])
     dur = song['duration_ms'] // 1000
-    url = f'https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}'
-    lrc_response = requests.get(
-        url=url
-    )
+    url = f'https://lrclib.net/api/get-cached?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}'
+    # artist['name'] can be empty if spotify attributes an album to "Various Artists"
+    # skip for now since it doesn't include any other artist data
+    if len(artist) == 0:
+        return ""
+    # "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
+    try:
+        lrc_response = requests.get(
+            url=url,
+            headers={'LRCGET':'v0.1.0 (https://github.com/iinsouciant/SpotifyRecommendation)'}
+        )
+        # if invalid response, can't find song
+        if lrc_response.status_code == 404:
+            return ""
+        return lrc_response.json()['plainLyrics']
+    except Exception as e:
+        print(f"Error occurred during lyric retrieval: {e}")
+        return ""
 
 def get_songs_pl(pl_id) -> Generator[Song]:
     """ Generator to get each song from a playlist so that it can be put into different data structures """
@@ -178,6 +194,7 @@ def get_songs_pl(pl_id) -> Generator[Song]:
                     "album": song["album"]['name'],
                     "duration_ms": song['duration_ms'],
                 }
+            # songDict['lyrics'] = get_song_lyrics(songDict)
             
             yield songDict
         offset += lim
@@ -202,6 +219,7 @@ def get_songs_album(al_id) -> Generator[Song]:
                 "album": album['name'],
                 "duration_ms": song['duration_ms'],
             }
+        # songDict['lyrics'] = get_song_lyrics(songDict)
         
         yield songDict
 
@@ -259,7 +277,7 @@ def get_new_releases(n: int =  25) -> Albums:
     deprecated and cannot be accessed. Always gives 404 Error"""
     albums = []
     offset = 0
-    lim = 50
+    lim = min(50, n)
     while offset < n:
         temp = sp.new_releases(
             limit=lim,
@@ -403,9 +421,11 @@ def display_playlist_recommendations(username, pl_id):
      even if it may save time trying to pull from API each time.
      Looking through available methods, will be easier to pull from some featured playlists.
     """
+    #   make it so user selects number of new releases to check for sinmilarity
     dataset = []
-    for pl_id in get_new_releases():
+    for pl_id in get_new_releases(1):
         for song in get_songs_album(pl_id):
+            song['lyrics'] = get_song_lyrics(song)
             dataset.append(song)
 
     
