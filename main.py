@@ -8,10 +8,10 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 
 # for webapps, microframework
 import flask
-from markupsafe import escape
+from urllib.parse import quote_plus
 
 from SinglyLinkedList import LinkedList
-from Stack import LinkedStack
+from Stack import Stack
 
 from typing import Any, Generator
 
@@ -26,9 +26,11 @@ SCOPES = [
 
 # used for type hints for readability
 type Album = dict[str, str]
-type Song = dict[str, Album]
+type AlbumName = str
+type Song = dict[str, Any]
 type Songs = list[Song]
 type Playlists = list[str]
+type Albums = list[tuple[Album,AlbumName]]
 
 
 class PlaylistLinkedList(LinkedList):
@@ -96,7 +98,7 @@ class PlaylistLinkedList(LinkedList):
             self.head = result.head
 
 
-class SongStack(LinkedStack):
+class SongStack(Stack):
     def __init__(self, songs: Songs = []):
         super().__init__()
 
@@ -126,14 +128,36 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
 
     return auth
 
-def get_songs(pl_id) -> Generator[Song]:
-    """ Generator to get each song from a playlist so that it can be put into different data structures"""
+
+def get_song_lyrics(song: Song):
+    """
+    Use spotify song data to look up lyrics from LRCLIB API. 
+    Instead of using Spotify's deprecated song features endpoint,
+    pivoting to semantic search lyrics. If time allows, try to pull in tempo and give score for closeness.
+    https://lrclib.net/docs
+
+    "Attempt to find the best match of lyrics for the track. You must provide the exact signature of the track, including the track title, artist name, album name, and the track's duration in seconds."
+
+    Example GET:
+    GET /api/get?artist_name=Borislav+Slavov&track_name=I+Want+to+Live&album_name=Baldur%27s+Gate+3+(Original+Game+Soundtrack)&duration=233
+
+    "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
+    """
+    artist = quote_plus(song['artists'][0]['name'])
+    dur = song['duration_ms'] // 1000
+    url = f'https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}'
+    lrc_response = requests.get(
+        url=url
+    )
+
+def get_songs_pl(pl_id) -> Generator[Song]:
+    """ Generator to get each song from a playlist so that it can be put into different data structures """
     offset = 0
     lim = 100
     while offset < 501:
         temp = sp.playlist_tracks(
             pl_id,
-            fields="items(track(id, name, artists, album(id, name)))",
+            fields="items(track(id, name, artists, album(name), duration_ms))",
             offset=offset,
             limit=lim
         )
@@ -143,85 +167,64 @@ def get_songs(pl_id) -> Generator[Song]:
             offset = 502
             break
 
-        for song in temp["items"]:
-            song = song['track']
+        for track in temp["items"]:
+            song = track['track']
             if len(song["name"]) == 0:
                 song["name"] = "blank"
             songDict: Song = {
                     "name": song["name"],
                     "artists": song["artists"],
                     "id": song["id"],
-                    "album": song["album"],
+                    "album": song["album"]['name'],
+                    "duration_ms": song['duration_ms'],
                 }
-            # optional song data shown from https://github.com/obielin/Music-recommendation-System/blob/main/spotify_recommendation_system.py
-            # maybe build off of later? NVM this is deprecated along with getting recommendations()
-            """
-            try:
-                # Get audio features for the track
-                audio_features = sp.audio_features(track_id)[0] if track_id != 'Not available' else None
-
-                # Get release date of the album
-                try:
-                    album_info = sp.album(album_id) if album_id != 'Not available' else None
-                    release_date = album_info['release_date'] if album_info else None
-                except:
-                    release_date = None
-
-                # Get popularity of the track
-                try:
-                    track_info = sp.track(track_id) if track_id != 'Not available' else None
-                    popularity = track_info['popularity'] if track_info else None
-                except:
-                    popularity = None
-
-                # Add additional track information to the track data
-                track_data = {
-                    'Track Name': track_name,
-                    'Artists': artists,
-                    'Album Name': album_name,
-                    'Album ID': album_id,
-                    'Track ID': track_id,
-                    'Popularity': popularity,
-                    'Release Date': release_date,
-                    'Duration (ms)': audio_features['duration_ms'] if audio_features else None,
-                    'Explicit': track_info.get('explicit', None),
-                    'External URLs': track_info.get('external_urls', {}).get('spotify', None),
-                    'Danceability': audio_features['danceability'] if audio_features else None,
-                    'Energy': audio_features['energy'] if audio_features else None,
-                    'Key': audio_features['key'] if audio_features else None,
-                    'Loudness': audio_features['loudness'] if audio_features else None,
-                    'Mode': audio_features['mode'] if audio_features else None,
-                    'Speechiness': audio_features['speechiness'] if audio_features else None,
-                    'Acousticness': audio_features['acousticness'] if audio_features else None,
-                    'Instrumentalness': audio_features['instrumentalness'] if audio_features else None,
-                    'Liveness': audio_features['liveness'] if audio_features else None,
-                    'Valence': audio_features['valence'] if audio_features else None,
-                    'Tempo': audio_features['tempo'] if audio_features else None,
-                    # Add more attributes as needed
-                }
-                songDict['data'] = track_data
-            """
+            
             yield songDict
         offset += lim
+
+def get_songs_album(al_id) -> Generator[Song]:
+    """ Generator to get each song from an album so that it can be put into different data structures.
+    Assumed that all albums num songs < default limit (50)"""
+    album = sp.album(
+        al_id,
+        # offset=offset,
+        # limit=lim
+    )
+
+    temp = album['tracks']['items']
+    for song in temp:
+        if len(song["name"]) == 0:
+            song["name"] = "blank"
+        songDict: Song = {
+                "name": song["name"],
+                "artists": song["artists"],
+                "id": song["id"],
+                "album": album['name'],
+                "duration_ms": song['duration_ms'],
+            }
+        
+        yield songDict
 
 
 def get_pl_stack(pl_id) -> SongStack:
     " For feeding last in to the recommendation system"
     songs = SongStack()
-    for song in get_songs(pl_id):
+    for song in get_songs_pl(pl_id):
         songs.push(song)
     return songs
 
 
 def get_pl_list(pl_id) -> Songs:
     """ For compiling song data into large set to get recommendations from"""
-    return [song for song in get_songs(pl_id)]
+    return [song for song in get_songs_pl(pl_id)]
 
 
 def get_ft_pls(n: int =  20) -> Playlists:
     """ Get n featured playlist IDs to be used with get_pl_list() 
     This approach will not work as the get-featured-playlists endpoint is now
-    deprecated and cannot be accessed. Always gives 404 Error"""
+    deprecated and cannot be accessed. Always gives 404 Error.
+    https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
+    """
     pls = []
     offset = 0
     lim = 50
@@ -250,36 +253,31 @@ def get_ft_pls(n: int =  20) -> Playlists:
     return pls
 
 
-def get_top_pls(n: int =  20) -> Playlists:
-    """ Get n featured playlist IDs to be used with get_pl_list() 
+def get_new_releases(n: int =  25) -> Albums:
+    """ Get n few albums IDs to be used with get_pl_list() 
     This approach will not work as the get-featured-playlists endpoint is now
     deprecated and cannot be accessed. Always gives 404 Error"""
-    pls = []
+    albums = []
     offset = 0
     lim = 50
     while offset < n:
-        # gives 404 error. deprecated? https://developer.spotify.com/documentation/web-api/reference/get-featured-playlists
-        # temp = sp.featured_playlists(
-        #     limit=lim,
-        #     offset=offset,
-        #     timestamp=None
-        # )
-        # 100% deprecated, not able to access https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
-        # a = requests.get(
-        #     url='https://api.spotify.com/v1/browse/featured-playlists',
-        #     headers={'Authorization': f"Bearer {cache_handler.get_cached_token()['access_token']}"}
-        # )
+        temp = sp.new_releases(
+            limit=lim,
+            offset=offset,
+            country="US"
+        )
+        temp = temp['albums']
 
-        # if there are no more playlists to get, items will be empty list
+        # if there are no more releases to get, items will be empty list
         if len(temp["items"]) == 0:
-            return pls
+            return albums
         
-        for pl in temp:
-            pls.append(pl['id'])
+        for album in temp['items']:
+            albums.append(album['id'])
 
         offset += lim
 
-    return pls
+    return albums
 
 
 app = flask.Flask(__name__)
@@ -406,14 +404,14 @@ def display_playlist_recommendations(username, pl_id):
      Looking through available methods, will be easier to pull from some featured playlists.
     """
     dataset = []
-    for pl_id in get_ft_pls():
-        for song in get_songs(pl_id):
+    for pl_id in get_new_releases():
+        for song in get_songs_album(pl_id):
             dataset.append(song)
-    #looking at the approach by Linda, they had a playlist of songs (presumably some trending playlist)
-    # then the user would feed in a song name in that playlist and get out n most similar songs weighted by recency
-    # I will adapt this approac by making a large list of songs from a handful of featured playlists and pulling them into one large list
-    return flask.render_template("index.html")
 
+    
+    # similarity in lyrics gained from https://lrclib.net/docs to then rank them instead
+    # use this to get similarity? https://whoosh.readthedocs.io/en/latest/intro.html
+    return flask.render_template("index.html")
 
 @app.route("/logout")
 def logout():
