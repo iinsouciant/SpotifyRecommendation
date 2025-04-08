@@ -2,3 +2,4 @@
 examples/
 *.sql
 __pycache__
+recommendation.png
