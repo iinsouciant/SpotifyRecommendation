@@ -34,7 +34,7 @@ type AlbumName = str
 type Song = dict[str, Any]
 type Songs = list[Song]
 type Playlists = list[str]
-type Albums = list[tuple[Album,AlbumName]]
+type Albums = list[tuple[Album, AlbumName]]
 
 
 class PlaylistLinkedList(LinkedList):
@@ -133,10 +133,10 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
-def get_song_lyrics(song: Song) -> str|None:
+def get_song_lyrics(song: Song) -> str | None:
     """
     Check local database for lyrics. If not there, insert into database
-    Use spotify song data to look up lyrics from LRCLIB API. 
+    Use spotify song data to look up lyrics from LRCLIB API.
     This API takes up most of the time required to get response back to user.
     Instead of using Spotify's deprecated song features endpoint,
     pivoting to semantic search lyrics. If time allows, try to pull in tempo and give score for closeness.
@@ -155,34 +155,37 @@ def get_song_lyrics(song: Song) -> str|None:
     if db_response:
         return db_response
 
-    artist = quote_plus(song['artists'][0]['name'])
-    track = quote_plus(song['name'])
-    album = quote_plus(song['album'])
-    dur = song['duration_ms'] // 1000
-    url = f'https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}'
+    artist = quote_plus(song["artists"][0]["name"])
+    track = quote_plus(song["name"])
+    album = quote_plus(song["album"])
+    dur = song["duration_ms"] // 1000
+    url = f"https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}"
     # artist['name'] can be empty if spotify attributes an album to "Various Artists"
     # skip for now since it doesn't include any other artist data
     if len(artist) == 0:
-        return 
+        return
     # "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
     try:
         lrc_response = requests.get(
             url=url,
-            headers={'LRCGET':'v0.1.0 (https://github.com/iinsouciant/SpotifyRecommendation)'}
+            headers={
+                "LRCGET": "v0.1.0 (https://github.com/iinsouciant/SpotifyRecommendation)"
+            },
         )
         # if invalid response, can't find song
         if lrc_response.status_code == 404:
-            database.insert_lyric(song['id'], "")
-            return 
-        lyrics = lrc_response.json()['plainLyrics']
-        database.insert_lyric(song['id'], lyrics)
+            database.insert_lyric(song["id"], "")
+            return
+        lyrics = lrc_response.json()["plainLyrics"]
+        database.insert_lyric(song["id"], lyrics)
         return lyrics
     except Exception as e:
         print(f"Error occurred during lyric retrieval: {e}")
-        return 
+        return
+
 
 def get_songs_pl(pl_id) -> Generator[Song]:
-    """ Generator to get each song from a playlist so that it can be put into different data structures """
+    """Generator to get each song from a playlist so that it can be put into different data structures"""
     offset = 0
     lim = 100
     while offset < 501:
@@ -190,7 +193,7 @@ def get_songs_pl(pl_id) -> Generator[Song]:
             pl_id,
             fields="items(track(id, name, artists, album(name), duration_ms))",
             offset=offset,
-            limit=lim
+            limit=lim,
         )
 
         # if there are no more songs to get, items will be empty list
@@ -199,23 +202,24 @@ def get_songs_pl(pl_id) -> Generator[Song]:
             break
 
         for track in temp["items"]:
-            song = track['track']
+            song = track["track"]
             if len(song["name"]) == 0:
                 song["name"] = "blank"
             songDict: Song = {
-                    "name": song["name"],
-                    "artists": song["artists"],
-                    "id": song["id"],
-                    "album": song["album"]['name'],
-                    "duration_ms": song['duration_ms'],
-                }
+                "name": song["name"],
+                "artists": song["artists"],
+                "id": song["id"],
+                "album": song["album"]["name"],
+                "duration_ms": song["duration_ms"],
+            }
             # songDict['lyrics'] = get_song_lyrics(songDict)
-            
+
             yield songDict
         offset += lim
 
+
 def get_songs_album(al_id) -> Generator[Song]:
-    """ Generator to get each song from an album so that it can be put into different data structures.
+    """Generator to get each song from an album so that it can be put into different data structures.
     Assumed that all albums num songs < default limit (50)"""
     album = sp.album(
         al_id,
@@ -223,24 +227,24 @@ def get_songs_album(al_id) -> Generator[Song]:
         # limit=lim
     )
 
-    temp = album['tracks']['items']
+    temp = album["tracks"]["items"]
     for song in temp:
         if len(song["name"]) == 0:
             song["name"] = "blank"
         songDict: Song = {
-                "name": song["name"],
-                "artists": song["artists"],
-                "id": song["id"],
-                "album": album['name'],
-                "duration_ms": song['duration_ms'],
-            }
+            "name": song["name"],
+            "artists": song["artists"],
+            "id": song["id"],
+            "album": album["name"],
+            "duration_ms": song["duration_ms"],
+        }
         # songDict['lyrics'] = get_song_lyrics(songDict)
-        
+
         yield songDict
 
 
 def get_pl_stack(pl_id) -> SongStack:
-    " For feeding last in to the recommendation system"
+    "For feeding last in to the recommendation system"
     songs = SongStack()
     for song in get_songs_pl(pl_id):
         songs.push(song)
@@ -248,12 +252,12 @@ def get_pl_stack(pl_id) -> SongStack:
 
 
 def get_pl_list(pl_id) -> Songs:
-    """ For compiling song data into large set to get recommendations from"""
+    """For compiling song data into large set to get recommendations from"""
     return [song for song in get_songs_pl(pl_id)]
 
 
-def get_ft_pls(n: int =  20) -> Playlists:
-    """ Get n featured playlist IDs to be used with get_pl_list() 
+def get_ft_pls(n: int = 20) -> Playlists:
+    """Get n featured playlist IDs to be used with get_pl_list()
     This approach will not work as the get-featured-playlists endpoint is now
     deprecated and cannot be accessed. Always gives 404 Error.
     https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
@@ -277,36 +281,32 @@ def get_ft_pls(n: int =  20) -> Playlists:
         # if there are no more playlists to get, items will be empty list
         if len(temp["items"]) == 0:
             return pls
-        
+
         for pl in temp:
-            pls.append(pl['id'])
+            pls.append(pl["id"])
 
         offset += lim
 
     return pls
 
 
-def get_new_releases(n: int =  25) -> Albums:
-    """ Get n few albums IDs to be used with get_pl_list() 
+def get_new_releases(n: int = 25) -> Albums:
+    """Get n few albums IDs to be used with get_pl_list()
     This approach will not work as the get-featured-playlists endpoint is now
     deprecated and cannot be accessed. Always gives 404 Error"""
     albums = []
     offset = 0
     lim = min(50, n)
     while offset < n:
-        temp = sp.new_releases(
-            limit=lim,
-            offset=offset,
-            country="US"
-        )
-        temp = temp['albums']
+        temp = sp.new_releases(limit=lim, offset=offset, country="US")
+        temp = temp["albums"]
 
         # if there are no more releases to get, items will be empty list
         if len(temp["items"]) == 0:
             return albums
-        
-        for album in temp['items']:
-            albums.append(album['id'])
+
+        for album in temp["items"]:
+            albums.append(album["id"])
 
         offset += lim
 
@@ -393,8 +393,9 @@ def user_select_playlist(username):
     user = sp.current_user()
     if not user or user["id"] != username:
         # redirect to correct profile
-        return flask.redirect(flask.url_for("user_select_playlist", username=user["id"]))
-    
+        return flask.redirect(
+            flask.url_for("user_select_playlist", username=user["id"])
+        )
 
     offset = 0
     lim = 50
@@ -420,7 +421,6 @@ def user_select_playlist(username):
     return flask.render_template("playlist_select.html", user=user, playlists=pls)
 
 
-
 @app.route("/<username>/<pl_id>/recommendations")
 def display_playlist_recommendations(username, pl_id):
     # make sure token is still valid
@@ -441,18 +441,18 @@ def display_playlist_recommendations(username, pl_id):
     startTime = time()
     for pl_id in get_new_releases(20):
         for song in get_songs_album(pl_id):
-            song['lyrics'] = get_song_lyrics(song)
+            song["lyrics"] = get_song_lyrics(song)
             dataset.append(song)
     linearDur = time() - startTime
     print(f"\nData set size: {len(dataset)}")
     print(f"Lyric get time: {linearDur:.9f} seconds\n")
 
-    
     # semantic search and get song distance to nearest neighbors + a weighted factor for bpm difference,
     # sum distance score in dataset for n songs in selected_songs
     # output html page with links to m songs with the lowest score
     # use this to get similarity? https://whoosh.readthedocs.io/en/latest/intro.html
     return flask.render_template("index.html")
+
 
 @app.route("/logout")
 def logout():
