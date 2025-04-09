@@ -10,7 +10,7 @@ import sqlite3
 from typing import Iterable, Any
 from pandas import read_sql, DataFrame
 
-type Row = sqlite3.Row
+type Row = tuple[str, str]
 type Lyrics = list[Row]
 type Song = Any
 
@@ -71,7 +71,14 @@ class LyricDB:
         data = [(song["id"], song["plainLyrics"]) for song in songs]
         self.insert_many("INSERT or IGNORE INTO lyrics(id, plainLyrics) VALUES (?, ?)", data)
 
-    def get_lyric_all(self) -> list[tuple[str, str]]:
+    def get_lyric_latest(self) -> Row:
+        """Get the most recent row in the db"""
+        with self.connect():
+            res = self.connection.cursor().execute('SELECT id, plainLyrics FROM lyrics').fetchone()
+        self.close()
+        return res
+
+    def get_lyric_all(self) -> Lyrics:
         # self.connect().row_factory = sqlite3.Row
         with self.connect():
             rows = (

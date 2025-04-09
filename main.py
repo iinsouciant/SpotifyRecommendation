@@ -38,7 +38,7 @@ type Albums = list[tuple[Album, AlbumName]]
 type Artist = dict[str, str]
 type Artists = list[Artist]
 
-
+# TODO property type hints
 class Song:
     """
     A simple object to hold 6 different standard text fields. This is essentially a dict
