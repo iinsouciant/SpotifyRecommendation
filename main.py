@@ -31,10 +31,94 @@ database = LyricDB()
 # used for type hints for readability
 type Album = dict[str, str]
 type AlbumName = str
-type Song = dict[str, Any]
 type Songs = list[Song]
 type Playlists = list[str]
 type Albums = list[tuple[Album, AlbumName]]
+type Artist = dict[str, str]
+type Artists = list[Artist]
+
+
+class Song():
+    """ 
+    A simple object to hold 6 different standard text fields. This is essentially a dict
+    with a couple helpful methods.
+
+    self.NAME : Song name
+    self.artists : list of artist dictionaries from Spotify API
+    self.ID : Spotify ID
+    self.ALBUM : Album name
+    self.DURATION_MS : Song duration in ms
+    self.LYRICS : Plain text lyrics
+    self.database : reference to initialized sqlite3 handler to retrieve lyrics when needed.
+    """
+
+    def __init__(self, name:str, artists:Artists, id:str, album:str, duration_ms:int, database:LyricDB, lyrics:str|None = None) -> None:
+        self.name = name
+        self.artists = artists
+        self.id = id
+        self.album = album
+        self.duration_ms = duration_ms
+        self.lyrics = lyrics
+        self.database = database
+
+    def __getitem__(self, key) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key, val) -> Any:
+        return setattr(self, key, val)
+
+    def get_lyrics(self) -> str | None:
+        """
+        Check local database for lyrics. If not there, insert into database
+        Use spotify song data to look up lyrics from LRCLIB API.
+        This API takes up most of the time required to get response back to user.
+        Instead of using Spotify's deprecated song features endpoint,
+        pivoting to semantic search lyrics. If time allows, try to pull in tempo and give score for closeness.
+        https://lrclib.net/docs
+
+        "Attempt to find the best match of lyrics for the track. You must provide the exact signature of the track, including the track title, artist name, album name, and the track's duration in seconds."
+
+        Example GET:
+        GET /api/get?artist_name=Borislav+Slavov&track_name=I+Want+to+Live&album_name=Baldur%27s+Gate+3+(Original+Game+Soundtrack)&duration=233
+
+        """
+        # Check local lyric database first
+        db_response = database.search_lyric(self)
+        if db_response == "":
+            return
+        if db_response:
+            return db_response
+
+        artist = quote_plus(self["artists"][0]["name"])
+        track = quote_plus(self["name"])
+        album = quote_plus(self["album"])
+        dur = self["duration_ms"] // 1000
+        url = f"https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}"
+        # artist['name'] can be empty if spotify attributes an album to "Various Artists"
+        # skip for now since it doesn't include any other artist data
+        if len(artist) == 0:
+            return
+        # "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
+        try:
+            lrc_response = requests.get(
+                url=url,
+                headers={
+                    "LRCGET": "v0.1.0 (https://github.com/iinsouciant/SpotifyRecommendation)"
+                },
+            )
+            # if invalid response, can't find song
+            if lrc_response.status_code == 404:
+                database.insert_lyric(self["id"], "")
+                return
+            lyrics = lrc_response.json()["plainLyrics"]
+            database.insert_lyric(self["id"], lyrics)
+            print(f"Lyrics for {self['name']} by ({self["artists"][0]["name"]}) not found in database. Retrieved from API.")
+            self['lyrics'] = lyrics
+            return lyrics
+        except Exception as e:
+            print(f"Error occurred during lyric retrieval: {e}")
+            return
+
 
 
 class PlaylistLinkedList(LinkedList):
@@ -133,57 +217,6 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
-def get_song_lyrics(song: Song) -> str | None:
-    """
-    Check local database for lyrics. If not there, insert into database
-    Use spotify song data to look up lyrics from LRCLIB API.
-    This API takes up most of the time required to get response back to user.
-    Instead of using Spotify's deprecated song features endpoint,
-    pivoting to semantic search lyrics. If time allows, try to pull in tempo and give score for closeness.
-    https://lrclib.net/docs
-
-    "Attempt to find the best match of lyrics for the track. You must provide the exact signature of the track, including the track title, artist name, album name, and the track's duration in seconds."
-
-    Example GET:
-    GET /api/get?artist_name=Borislav+Slavov&track_name=I+Want+to+Live&album_name=Baldur%27s+Gate+3+(Original+Game+Soundtrack)&duration=233
-
-    """
-    # Check local lyric database first
-    db_response = database.search_lyric(song)
-    if db_response == "":
-        return
-    if db_response:
-        return db_response
-
-    artist = quote_plus(song["artists"][0]["name"])
-    track = quote_plus(song["name"])
-    album = quote_plus(song["album"])
-    dur = song["duration_ms"] // 1000
-    url = f"https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}"
-    # artist['name'] can be empty if spotify attributes an album to "Various Artists"
-    # skip for now since it doesn't include any other artist data
-    if len(artist) == 0:
-        return
-    # "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
-    try:
-        lrc_response = requests.get(
-            url=url,
-            headers={
-                "LRCGET": "v0.1.0 (https://github.com/iinsouciant/SpotifyRecommendation)"
-            },
-        )
-        # if invalid response, can't find song
-        if lrc_response.status_code == 404:
-            database.insert_lyric(song["id"], "")
-            return
-        lyrics = lrc_response.json()["plainLyrics"]
-        database.insert_lyric(song["id"], lyrics)
-        return lyrics
-    except Exception as e:
-        print(f"Error occurred during lyric retrieval: {e}")
-        return
-
-
 def get_songs_pl(pl_id) -> Generator[Song]:
     """Generator to get each song from a playlist so that it can be put into different data structures"""
     offset = 0
@@ -202,19 +235,20 @@ def get_songs_pl(pl_id) -> Generator[Song]:
             break
 
         for track in temp["items"]:
-            song = track["track"]
-            if len(song["name"]) == 0:
-                song["name"] = "blank"
-            songDict: Song = {
-                "name": song["name"],
-                "artists": song["artists"],
-                "id": song["id"],
-                "album": song["album"]["name"],
-                "duration_ms": song["duration_ms"],
-            }
-            # songDict['lyrics'] = get_song_lyrics(songDict)
+            songDict = track["track"]
+            if len(songDict["name"]) == 0:
+                songDict["name"] = "blank"
+            song = Song(
+                name = songDict["name"],
+                artists = songDict["artists"],
+                id = songDict["id"],
+                album = songDict["album"]["name"],
+                duration_ms = songDict["duration_ms"],
+                database=database
+            )
+            # song.get_lyrics()
 
-            yield songDict
+            yield song
         offset += lim
 
 
@@ -228,19 +262,20 @@ def get_songs_album(al_id) -> Generator[Song]:
     )
 
     temp = album["tracks"]["items"]
-    for song in temp:
-        if len(song["name"]) == 0:
-            song["name"] = "blank"
-        songDict: Song = {
-            "name": song["name"],
-            "artists": song["artists"],
-            "id": song["id"],
-            "album": album["name"],
-            "duration_ms": song["duration_ms"],
-        }
-        # songDict['lyrics'] = get_song_lyrics(songDict)
+    for songDict in temp:
+        if len(songDict["name"]) == 0:
+            songDict["name"] = "blank"
+        song = Song(
+            name = songDict["name"],
+            artists = songDict["artists"],
+            id = songDict["id"],
+            album = album["name"],
+            duration_ms = songDict["duration_ms"],
+            database=database
+        )
+        # song.get_lyrics()
 
-        yield songDict
+        yield song
 
 
 def get_pl_stack(pl_id) -> SongStack:
@@ -439,10 +474,11 @@ def display_playlist_recommendations(username, pl_id):
     #   make it so user selects number of new releases to check for sinmilarity
     dataset = []
     startTime = time()
-    for pl_id in get_new_releases(20):
+    for pl_id in get_new_releases(100):
         for song in get_songs_album(pl_id):
-            song["lyrics"] = get_song_lyrics(song)
+            song.get_lyrics()
             dataset.append(song)
+            print(f"Got lyrics for: ({song['name']}) by ({song["artists"][0]["name"]})")
     linearDur = time() - startTime
     print(f"\nData set size: {len(dataset)}")
     print(f"Lyric get time: {linearDur:.9f} seconds\n")
