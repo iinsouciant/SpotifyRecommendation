@@ -4,7 +4,6 @@ https://www.youtube.com/watch?v=sNa_uiqSlJo to get embeddings
 """
 
 import os.path
-import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
@@ -15,7 +14,7 @@ from lyricDB import LyricDB
 
 type Row = tuple[str, str]
 type LyricSet = list[Row]
-type Songs = list[str]
+type SongIDs = list[str]
 
 
 class Recommender:
@@ -86,8 +85,12 @@ class Recommender:
         # adds column for score into copy of self.df
         return self.df.merge(results, on="item_id", how="inner")
 
-    def get_recommendations(self, data: LyricSet, n: int = 10) -> Songs:
-        """Returns list of Spotify song ids for those with lowest score (distance)"""
+    def get_recommendations(self, data: LyricSet, n: int = 10) -> SongIDs:
+        """
+        Returns list of Spotify song ids for those with lowest score (distance).
+        Future iterations would do song sound analysis to get tempo, key, etc and recommend scores
+        more effectively
+        """
         result = self.df.copy()
         result["score"] = None
         for row in data:
@@ -95,7 +98,7 @@ class Recommender:
             result["score"] += a["score"]
         # get lowest score
         result.sort_values("score")
-        return [(row[2], row[3]) for row in result.iloc[:n].itertuples(name=None)]
+        return [row[2] for row in result.iloc[:n].itertuples(name=None)]
 
 
 if __name__ == "__main__":
