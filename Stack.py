@@ -18,6 +18,9 @@ class Stack:
     def __init__(self):
         self.stack = []
 
+    def __len__(self):
+        return len(self.stack)
+
     def isEmpty(self) -> bool:
         return len(self.stack) == 0
     
