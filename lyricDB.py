@@ -3,6 +3,7 @@ Quick basic DB to store lyrics by spotify song ID.
 Check first for data in ___ class for song lyrics, then grab from 
 https://lrclib.net/docs if it does not exist. This way the process 
 will not have to wait forever in between API responses.
+Ref: https://docs.python.org/3/library/sqlite3.html
 """
 
 import sqlite3
@@ -49,7 +50,7 @@ class LyricDB:
         self.close()
 
     def __create_table(self) -> None:
-        self.execute('CREATE TABLE IF NOT EXISTS lyrics(id INTEGER PRIMARY KEY, plainLyrics TEXT)')
+        self.execute('CREATE TABLE IF NOT EXISTS lyrics(id TEXT PRIMARY KEY, plainLyrics TEXT)')
 
     def insert_many(self, query:str, data:list[tuple[int,str]]) -> None:
         self.executemany(query, data)
@@ -80,7 +81,7 @@ class LyricDB:
 
 if __name__ == "__main__":
     lyrics = LyricDB()
-    example = [{'id':i, 'plainLyrics':str(i)} for i in range(100)]
+    example = [{'id':str(i), 'plainLyrics':str(i)} for i in range(100)]
     for test in example[:49]:
         lyrics.insert_lyric(test['id'], test['plainLyrics'])
     for item in lyrics.get_lyric_all():

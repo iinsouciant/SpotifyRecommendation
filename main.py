@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+from time import time
 
 import requests
 from spotipy import Spotify
@@ -12,6 +13,7 @@ from urllib.parse import quote_plus
 
 from SinglyLinkedList import LinkedList
 from Stack import Stack
+from lyricDB import LyricDB
 
 from typing import Any, Generator
 
@@ -23,6 +25,8 @@ SCOPES = [
     "playlist-modify-public",
     "user-library-read",
 ]
+
+database = LyricDB()
 
 # used for type hints for readability
 type Album = dict[str, str]
@@ -129,8 +133,9 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
-def get_song_lyrics(song: Song) -> str:
+def get_song_lyrics(song: Song) -> str|None:
     """
+    Check local database for lyrics. If not there, insert into database
     Use spotify song data to look up lyrics from LRCLIB API. 
     This API takes up most of the time required to get response back to user.
     Instead of using Spotify's deprecated song features endpoint,
@@ -143,15 +148,22 @@ def get_song_lyrics(song: Song) -> str:
     GET /api/get?artist_name=Borislav+Slavov&track_name=I+Want+to+Live&album_name=Baldur%27s+Gate+3+(Original+Game+Soundtrack)&duration=233
 
     """
+    # Check local lyric database first
+    db_response = database.search_lyric(song)
+    if db_response == "":
+        return
+    if db_response:
+        return db_response
+
     artist = quote_plus(song['artists'][0]['name'])
     track = quote_plus(song['name'])
     album = quote_plus(song['album'])
     dur = song['duration_ms'] // 1000
-    url = f'https://lrclib.net/api/get-cached?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}'
+    url = f'https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={dur}'
     # artist['name'] can be empty if spotify attributes an album to "Various Artists"
     # skip for now since it doesn't include any other artist data
     if len(artist) == 0:
-        return ""
+        return 
     # "...If you are developing an application to interact with LRCLIB, we encourage you to include the User-Agent header in your requests, specifying your application's name, version, and a link to its homepage or project page. For example: LRCGET v0.2.0 (https://github.com/tranxuanthang/lrcget)."
     try:
         lrc_response = requests.get(
@@ -160,11 +172,14 @@ def get_song_lyrics(song: Song) -> str:
         )
         # if invalid response, can't find song
         if lrc_response.status_code == 404:
-            return ""
-        return lrc_response.json()['plainLyrics']
+            database.insert_lyric(song['id'], "")
+            return 
+        lyrics = lrc_response.json()['plainLyrics']
+        database.insert_lyric(song['id'], lyrics)
+        return lyrics
     except Exception as e:
         print(f"Error occurred during lyric retrieval: {e}")
-        return ""
+        return 
 
 def get_songs_pl(pl_id) -> Generator[Song]:
     """ Generator to get each song from a playlist so that it can be put into different data structures """
@@ -423,13 +438,19 @@ def display_playlist_recommendations(username, pl_id):
     """
     #   make it so user selects number of new releases to check for sinmilarity
     dataset = []
-    for pl_id in get_new_releases(1):
+    startTime = time()
+    for pl_id in get_new_releases(20):
         for song in get_songs_album(pl_id):
             song['lyrics'] = get_song_lyrics(song)
             dataset.append(song)
+    linearDur = time() - startTime
+    print(f"\nData set size: {len(dataset)}")
+    print(f"Lyric get time: {linearDur:.9f} seconds\n")
 
     
-    # similarity in lyrics gained from https://lrclib.net/docs to then rank them instead
+    # semantic search and get song distance to nearest neighbors + a weighted factor for bpm difference,
+    # sum distance score in dataset for n songs in selected_songs
+    # output html page with links to m songs with the lowest score
     # use this to get similarity? https://whoosh.readthedocs.io/en/latest/intro.html
     return flask.render_template("index.html")
 
