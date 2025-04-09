@@ -11,7 +11,7 @@ from typing import Iterable, Any
 
 type Row = sqlite3.Row
 type Lyrics = list[Row]
-type Song = dict[str, Any]
+type Song = Any
 
 
 class LyricDB:
@@ -59,8 +59,12 @@ class LyricDB:
         self.executemany(query, data)
 
     def insert_lyric(self, id: str, lyrics: str) -> None:
-        # check if song id already exists. if so, overwrite
+        # check if song id already exists. if so, ignore
         self.execute("INSERT or IGNORE INTO lyrics VALUES (?, ?)", (id, lyrics))
+
+    def replace_lyric(self, id: str, lyrics: str) -> None:
+        # check if song id already exists. if so, overwrite
+        self.execute("INSERT or REPLACE INTO lyrics VALUES (?, ?)", (id, lyrics))
 
     def insert_lyric_many(self, songs: list[dict[Any, Any]]) -> None:
         data = [(song["id"], song["plainLyrics"]) for song in songs]
@@ -86,6 +90,14 @@ class LyricDB:
         if len(response) > 0:
             return response[0][1]
 
+    def remove_lyric(self, id: str) -> None:
+        with self.connect():
+            self.cursor = self.connection.execute(
+                "DELETE FROM lyrics WHERE id = (?)", [id]
+            )
+            # doesn't look like there's a way to retrieve that data w/o query select beforehand
+            # response = self.cursor.fetchall()
+
 
 if __name__ == "__main__":
     lyrics = LyricDB()
@@ -100,3 +112,6 @@ if __name__ == "__main__":
     print(lyrics.search_lyric(testSong))
     testSong = {"id": 90}
     print(lyrics.search_lyric(testSong))
+    for test in example:
+        lyrics.remove_lyric(test["id"])
+        print(lyrics.search_lyric(test))
