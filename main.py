@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 from time import time
+import base64
 
 import requests
 from spotipy import Spotify
@@ -38,8 +39,8 @@ type Artist = dict[str, str]
 type Artists = list[Artist]
 
 
-class Song():
-    """ 
+class Song:
+    """
     A simple object to hold 6 different standard text fields. This is essentially a dict
     with a couple helpful methods.
 
@@ -52,7 +53,16 @@ class Song():
     self.database : reference to initialized sqlite3 handler to retrieve lyrics when needed.
     """
 
-    def __init__(self, name:str, artists:Artists, id:str, album:str, duration_ms:int, database:LyricDB, lyrics:str|None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        artists: Artists,
+        id: str | int,
+        album: str,
+        duration_ms: int,
+        database: LyricDB,
+        lyrics: str | None = None,
+    ) -> None:
         self.name = name
         self.artists = artists
         self.id = id
@@ -112,13 +122,14 @@ class Song():
                 return
             lyrics = lrc_response.json()["plainLyrics"]
             database.insert_lyric(self["id"], lyrics)
-            print(f"Lyrics for {self['name']} by ({self["artists"][0]["name"]}) not found in database. Retrieved from API.")
-            self['lyrics'] = lyrics
+            print(
+                f"Lyrics for {self['name']} by ({self['artists'][0]['name']}) not found in database. Retrieved from API."
+            )
+            self["lyrics"] = lyrics
             return lyrics
         except Exception as e:
             print(f"Error occurred during lyric retrieval: {e}")
             return
-
 
 
 class PlaylistLinkedList(LinkedList):
@@ -217,7 +228,7 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
-def get_songs_pl(pl_id) -> Generator[Song]:
+def get_songs_pl(pl_id) -> Song:
     """Generator to get each song from a playlist so that it can be put into different data structures"""
     offset = 0
     lim = 100
@@ -239,12 +250,12 @@ def get_songs_pl(pl_id) -> Generator[Song]:
             if len(songDict["name"]) == 0:
                 songDict["name"] = "blank"
             song = Song(
-                name = songDict["name"],
-                artists = songDict["artists"],
-                id = songDict["id"],
-                album = songDict["album"]["name"],
-                duration_ms = songDict["duration_ms"],
-                database=database
+                name=songDict["name"],
+                artists=songDict["artists"],
+                id=songDict["id"],
+                album=songDict["album"]["name"],
+                duration_ms=songDict["duration_ms"],
+                database=database,
             )
             # song.get_lyrics()
 
@@ -252,7 +263,7 @@ def get_songs_pl(pl_id) -> Generator[Song]:
         offset += lim
 
 
-def get_songs_album(al_id) -> Generator[Song]:
+def get_songs_album(al_id) -> Song:
     """Generator to get each song from an album so that it can be put into different data structures.
     Assumed that all albums num songs < default limit (50)"""
     album = sp.album(
@@ -266,12 +277,12 @@ def get_songs_album(al_id) -> Generator[Song]:
         if len(songDict["name"]) == 0:
             songDict["name"] = "blank"
         song = Song(
-            name = songDict["name"],
-            artists = songDict["artists"],
-            id = songDict["id"],
-            album = album["name"],
-            duration_ms = songDict["duration_ms"],
-            database=database
+            name=songDict["name"],
+            artists=songDict["artists"],
+            id=songDict["id"],
+            album=album["name"],
+            duration_ms=songDict["duration_ms"],
+            database=database,
         )
         # song.get_lyrics()
 
@@ -348,6 +359,7 @@ def get_new_releases(n: int = 25) -> Albums:
     return albums
 
 
+# maybe combine this stuff into init of a class to make it more organized?
 app = flask.Flask(__name__)
 # store user access token in app session, encrypted with secret key
 app.config["SECRET_KEY"] = get_secret_key()
@@ -478,7 +490,7 @@ def display_playlist_recommendations(username, pl_id):
         for song in get_songs_album(pl_id):
             song.get_lyrics()
             dataset.append(song)
-            print(f"Got lyrics for: ({song['name']}) by ({song["artists"][0]["name"]})")
+            print(f"Got lyrics for: ({song['name']}) by ({song['artists'][0]['name']})")
     linearDur = time() - startTime
     print(f"\nData set size: {len(dataset)}")
     print(f"Lyric get time: {linearDur:.9f} seconds\n")

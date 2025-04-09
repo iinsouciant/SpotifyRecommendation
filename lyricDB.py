@@ -8,6 +8,7 @@ Ref: https://docs.python.org/3/library/sqlite3.html
 
 import sqlite3
 from typing import Iterable, Any
+from pandas import read_sql, DataFrame
 
 type Row = sqlite3.Row
 type Lyrics = list[Row]
@@ -52,7 +53,7 @@ class LyricDB:
 
     def __create_table(self) -> None:
         self.execute(
-            "CREATE TABLE IF NOT EXISTS lyrics(id TEXT PRIMARY KEY, plainLyrics TEXT)"
+            "CREATE TABLE IF NOT EXISTS lyrics(item_id INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT, plainLyrics TEXT)"
         )
 
     def insert_many(self, query: str, data: list[tuple[str, str]]) -> None:
@@ -60,22 +61,33 @@ class LyricDB:
 
     def insert_lyric(self, id: str, lyrics: str) -> None:
         # check if song id already exists. if so, ignore
-        self.execute("INSERT or IGNORE INTO lyrics VALUES (?, ?)", (id, lyrics))
+        self.execute("INSERT or IGNORE INTO lyrics(id, plainLyrics) VALUES (?, ?)", (id, lyrics))
 
     def replace_lyric(self, id: str, lyrics: str) -> None:
         # check if song id already exists. if so, overwrite
-        self.execute("INSERT or REPLACE INTO lyrics VALUES (?, ?)", (id, lyrics))
+        self.execute("INSERT or REPLACE INTO lyrics(id, plainLyrics) VALUES (?, ?)", (id, lyrics))
 
     def insert_lyric_many(self, songs: list[dict[Any, Any]]) -> None:
         data = [(song["id"], song["plainLyrics"]) for song in songs]
-        self.insert_many("INSERT or IGNORE INTO lyrics VALUES (?, ?)", data)
+        self.insert_many("INSERT or IGNORE INTO lyrics(id, plainLyrics) VALUES (?, ?)", data)
 
-    def get_lyric_all(self) -> list[tuple[int, str]]:
+    def get_lyric_all(self) -> list[tuple[str, str]]:
         # self.connect().row_factory = sqlite3.Row
         with self.connect():
             rows = (
                 self.connection.cursor()
                 .execute("SELECT id, plainLyrics from lyrics")
+                .fetchall()
+            )
+        self.close()
+        return rows
+
+    def get_all(self) -> list[tuple[str, str, int]]:
+        # self.connect().row_factory = sqlite3.Row
+        with self.connect():
+            rows = (
+                self.connection.cursor()
+                .execute("SELECT id, plainLyrics, item_id from lyrics")
                 .fetchall()
             )
         self.close()
@@ -97,7 +109,11 @@ class LyricDB:
             )
             # doesn't look like there's a way to retrieve that data w/o query select beforehand
             # response = self.cursor.fetchall()
-
+    
+    def get_df(self) -> DataFrame:
+        """ Get DataFrame from pandas to get embeddings for semantic search"""
+        return read_sql('SELECT * FROM lyrics',self.connect())
+    
 
 if __name__ == "__main__":
     lyrics = LyricDB()
