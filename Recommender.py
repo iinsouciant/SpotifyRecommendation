@@ -28,6 +28,8 @@ class Recommender:
         self.model: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2")
 
         self.index: Index = self.get_index()
+        self.recDF = self.df.copy()
+        self.recDF["score"] = None
 
     def get_index(self) -> Index:
         if os.path.isfile(self.indexPath):
@@ -85,24 +87,27 @@ class Recommender:
         # adds column for score into copy of self.df
         return self.df.merge(results, on="item_id", how="inner")
 
+    def store_score(self, lyrics: str) -> None:
+        """Take one song's lyrics and store the similarity scores"""
+        self.recDF["score"] += self.search(lyrics)["score"]
+
     def get_recommendations(self, data: LyricSet, n: int = 10) -> SongIDs:
         """
         Returns list of Spotify song ids for those with lowest score (distance).
         Future iterations would do song sound analysis to get tempo, key, etc and recommend scores
         more effectively
         """
-        result = self.df.copy()
-        result["score"] = None
         for row in data:
-            a = self.search(row[1])
-            result["score"] += a["score"]
+            self.recDF["score"] += self.search(row[1])["score"]
         # get lowest score
-        result.sort_values("score")
-        return [row[2] for row in result.iloc[:n].itertuples(name=None)]
+        self.recDF.sort_values("score")
+        return [row[2] for row in self.recDF.iloc[:n].itertuples(name=None)]
 
 
 if __name__ == "__main__":
     db = LyricDB()
     rec = Recommender(db)
-    for test in rec.get_recommendations(db.get_lyric_all()[:10]):
+    for test1 in db.get_lyric_all()[:10]:
+        rec.store_score(test1[1])
+    for test in rec.get_recommendations(db.get_lyric_all()[10:15]):
         print(test)
