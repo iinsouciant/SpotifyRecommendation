@@ -382,7 +382,7 @@ sp_oauth = get_oauth(cache_handler)
 sp = Spotify(auth_manager=sp_oauth)
 # maybe combine this stuff into init of a class to make it more organized?
 # song recommender
-# recommender = Recommender(database)
+recommender = Recommender(database)
 
 # first endpoint. want user to see this when they access
 @app.route("/")
@@ -524,7 +524,7 @@ def display_playlist_recommendations(username, pl_id:str, n:int = 10):
     linearDur = time() - startTime
     print(f"\nData set size: {len(dataset)}")
     print(f"Lyric get time: {linearDur:.9f} seconds\n")
-    return flask.redirect(flask.url_for('home'))
+    # return flask.redirect(flask.url_for('home'))
     # get i songs from playlist to get recommendations for
     i = min(30, len(selected_songs))
     while i >= 0:
