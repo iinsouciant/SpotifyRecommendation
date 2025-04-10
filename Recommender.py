@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer
 from voyager import Index, Space
 
 from lyricDB import LyricDB
+from time import sleep
 
 type Row = tuple[str, str]
 type LyricSet = list[Row]
@@ -27,9 +28,11 @@ class Recommender:
         # pretrained model to get embeddings
         self.model: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2")
 
+        sleep(2)
         self.index: Index = self.get_index()
         self.recDF = self.df.copy()
         self.recDF["score"] = None
+
 
     def get_index(self) -> Index:
         if os.path.isfile(self.indexPath):
@@ -75,7 +78,7 @@ class Recommender:
         If multiple query vectors were provided, both neighbor_ids and distances will be of shape (num_queries, k), ordered such that the i-th result corresponds with the i-th query vector.
     """
 
-    def search(self, lyrics: str, k: int = 10) -> DataFrame:
+    def search(self, lyrics: str, k: int = 20) -> DataFrame:
         """Search the index using song lyrics and get back k nearest neighbors"""
         # take our input song lyrics and embed
         vec = self.model.encode(lyrics)
@@ -91,14 +94,15 @@ class Recommender:
         """Take one song's lyrics and store the similarity scores"""
         self.recDF["score"] += self.search(lyrics)["score"]
 
-    def get_recommendations(self, data: LyricSet, n: int = 10) -> SongIDs:
+    def get_recommendations(self, data: LyricSet|None = None, n: int = 10) -> SongIDs:
         """
         Returns list of Spotify song ids for those with lowest score (distance).
         Future iterations would do song sound analysis to get tempo, key, etc and recommend scores
         more effectively
         """
-        for row in data:
-            self.recDF["score"] += self.search(row[1])["score"]
+        if data:
+            for row in data:
+                self.store_score(row[1])
         # get lowest score
         self.recDF.sort_values("score")
         return [row[2] for row in self.recDF.iloc[:n].itertuples(name=None)]

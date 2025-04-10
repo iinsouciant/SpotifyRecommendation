@@ -15,6 +15,7 @@ from urllib.parse import quote_plus
 from SinglyLinkedList import LinkedList
 from Stack import Stack
 from lyricDB import LyricDB
+from Recommender import Recommender
 
 from typing import Any, Generator
 
@@ -38,18 +39,17 @@ type Albums = list[tuple[Album, AlbumName]]
 type Artist = dict[str, str]
 type Artists = list[Artist]
 
-# TODO property type hints
 class Song:
     """
     A simple object to hold 6 different standard text fields. This is essentially a dict
     with a couple helpful methods.
 
-    self.NAME : Song name
+    self.name : Song name
     self.artists : list of artist dictionaries from Spotify API
-    self.ID : Spotify ID
-    self.ALBUM : Album name
-    self.DURATION_MS : Song duration in ms
-    self.LYRICS : Plain text lyrics
+    self.id : Spotify ID
+    self.album : Album name
+    self.duration_ms : Song duration in ms
+    self.lyrics : Plain text lyrics
     self.database : reference to initialized sqlite3 handler to retrieve lyrics when needed.
     """
 
@@ -228,7 +228,21 @@ def get_oauth(cache_handler) -> SpotifyOAuth:
     return auth
 
 
-def get_songs_pl(pl_id) -> Song:
+def get_song(song_id:str) -> Song:
+    """ Get Song object by Spotify track ID"""
+    res = sp.track(song_id)
+    song = Song(
+        name=res["name"],
+        artists=res["artists"],
+        id=res["id"],
+        album=res["album"]["name"],
+        duration_ms=res["duration_ms"],
+        database=database,
+    )
+    return song
+
+
+def get_songs_pl(pl_id) -> Generator[Song, Song, Song]:
     """Generator to get each song from a playlist so that it can be put into different data structures"""
     offset = 0
     lim = 100
@@ -263,7 +277,7 @@ def get_songs_pl(pl_id) -> Song:
         offset += lim
 
 
-def get_songs_album(al_id) -> Song:
+def get_songs_album(al_id) -> Generator[Song, Song, Song]:
     """Generator to get each song from an album so that it can be put into different data structures.
     Assumed that all albums num songs < default limit (50)"""
     album = sp.album(
@@ -359,7 +373,6 @@ def get_new_releases(n: int = 25) -> Albums:
     return albums
 
 
-# maybe combine this stuff into init of a class to make it more organized?
 app = flask.Flask(__name__)
 # store user access token in app session, encrypted with secret key
 app.config["SECRET_KEY"] = get_secret_key()
@@ -367,7 +380,9 @@ app.config["SECRET_KEY"] = get_secret_key()
 cache_handler = FlaskSessionCacheHandler(flask.session)
 sp_oauth = get_oauth(cache_handler)
 sp = Spotify(auth_manager=sp_oauth)
-
+# maybe combine this stuff into init of a class to make it more organized?
+# song recommender
+# recommender = Recommender(database)
 
 # first endpoint. want user to see this when they access
 @app.route("/")
@@ -469,11 +484,26 @@ def user_select_playlist(username):
 
 
 @app.route("/<username>/<pl_id>/recommendations")
-def display_playlist_recommendations(username, pl_id):
+def display_playlist_recommendations(username, pl_id:str, n:int = 10):
     # make sure token is still valid
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         return flask.redirect(flask.url_for("login"))
+    
+    # if this is not user's profile, redirect them
+    user = sp.current_user()
+    if not user or user["id"] != username:
+        # redirect to correct profile
+        return flask.redirect(
+            flask.url_for("user_select_playlist", username=user["id"])
+        )
 
+    try:
+        pl = sp.playlist(pl_id, fields='name,external_urls')
+        pl_name = pl['name']
+        pl_url = pl['external_urls']['spotify']
+    except Exception as e:
+        print("Error retrieving playlist ("+str(pl_id)+f"): ({e})")
+        return flask.redirect(flask.url_for('home'))
     # songs to feed in to recommendation system
     selected_songs = get_pl_stack(pl_id)
     # pull from ?? featured playlists and start getting scores for each track
@@ -486,7 +516,7 @@ def display_playlist_recommendations(username, pl_id):
     #   make it so user selects number of new releases to check for sinmilarity
     dataset = []
     startTime = time()
-    for pl_id in get_new_releases(100):
+    for pl_id in get_new_releases(50):
         for song in get_songs_album(pl_id):
             song.get_lyrics()
             dataset.append(song)
@@ -494,12 +524,24 @@ def display_playlist_recommendations(username, pl_id):
     linearDur = time() - startTime
     print(f"\nData set size: {len(dataset)}")
     print(f"Lyric get time: {linearDur:.9f} seconds\n")
-
-    # semantic search and get song distance to nearest neighbors + a weighted factor for bpm difference,
-    # sum distance score in dataset for n songs in selected_songs
+    return flask.redirect(flask.url_for('home'))
+    # get i songs from playlist to get recommendations for
+    i = min(30, len(selected_songs))
+    while i >= 0:
+        # need to take care of case where the first 30 songs don't have lyrics
+        i -= 1
+        song:Song = selected_songs.pop()
+        if song.get_lyrics():
+            print(f"Got lyrics for: ({song['name']}) by ({song['artists'][0]['name']})")
+            try:
+                recommender.store_score(song['lyrics'])
+            except Exception as e:
+                print(f"Error while getting score for ({song['name']}): ({e})")
+    # semantic search and get song distance to nearest neighbors,
+    # sums distance score in dataset for n songs in selected_songs
+    songs = [get_song(id) for id in recommender.get_recommendations()]
     # output html page with links to m songs with the lowest score
-    # use this to get similarity? https://whoosh.readthedocs.io/en/latest/intro.html
-    return flask.render_template("index.html")
+    return flask.render_template("recommendations.html", user=user, pl_url=pl_url, pl_name=pl_name, songs=songs)
 
 
 @app.route("/logout")

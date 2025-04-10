@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+
+{% block navbar_content %}
+                    <link href="{{ url_for('static', filename='recommendations.css') }}" rel="stylesheet" />
+                    <div class="navbar-nav-content">
+                        <div class="navbar-nav-links1">
+                            <a href="https://github.com/iinsouciant" target="_blank" rel="noreferrer noopener"
+                                class="navbar-link1 nav-link">
+                                My GitHub
+                            </a>
+                        </div>
+                        <a href="{{ user['external_urls']['spotify'] }}" target="_blank" rel="noreferrer noopener"
+                            class="navbar-link2">
+                            <div class="navbar-get-started1 get-started">
+                                <span class="navbar-text1">Spotify</span>
+                            </div>
+                        </a>
+                        <div id="open-mobile-menu" class="navbar-hamburger get-started">
+                            <img alt="image" src="{{url_for('static', filename='Icons/hamburger-200h.png')}}"
+                                class="navbar-image1" />
+                        </div>
+                    </div>
+                    <div id="mobile-menu" class="navbar-mobile-menu">
+                        <div class="navbar-branding">
+                            <img alt="image" src="{{url_for('static', filename='Icons/tiger-bleh-no-bg-200w.png')}}"
+                                class="navbar-image2" />
+                            <div id="close-mobile-menu" class="navbar-container1">
+                                <svg viewBox="0 0 1024 1024" class="navbar-icon1">
+                                    <path
+                                        d="M225.835 286.165l225.835 225.835-225.835 225.835c-16.683 16.683-16.683 43.691 0 60.331s43.691 16.683 60.331 0l225.835-225.835 225.835 225.835c16.683 16.683 43.691 16.683 60.331 0s16.683-43.691 0-60.331l-225.835-225.835 225.835-225.835c16.683-16.683 16.683-43.691 0-60.331s-43.691-16.683-60.331 0l-225.835 225.835-225.835-225.835c-16.683-16.683-43.691-16.683-60.331 0s-16.683 43.691 0 60.331z">
+                                    </path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="navbar-nav-links2">
+                            <a href="https://github.com/iinsouciant" target="_blank" rel="noreferrer noopener"
+                                class="navbar-link2 nav-link">
+                                My GitHub
+                            </a>
+                        </div>
+                        <a href="{{ user['external_urls']['spotify'] }}" target="_blank" rel="noreferrer noopener"
+                            class="navbar-text2 nav-link">
+                            <div class="get-started">
+                                Spotify
+                            </div>
+                        </a>
+                    </div>
+                    <div>
+                        <div class="navbar-container3">
+                            <script defer="">
+                                /*
+                            Mobile menu - Code Embed
+                            */
+
+                                /* listenForUrlChangesMobileMenu() makes sure that if you changes pages inside your app,
+                                the mobile menu will still work*/
+
+                                const listenForUrlChangesMobileMenu = () => {
+                                    let url = location.href;
+                                    document.body.addEventListener('click', () => {
+                                        requestAnimationFrame(() => {
+                                            if (url !== location.href) {
+                                                runMobileMenuCodeEmbed();
+                                                url = location.href;
+                                            }
+                                        });
+                                    },
+                                        true
+                                    );
+                                };
+
+                                const runMobileMenuCodeEmbed = () => {
+                                    // Mobile menu
+                                    const mobileMenu = document.querySelector('#mobile-menu')
+
+                                    // Buttons
+                                    const closeButton = document.querySelector('#close-mobile-menu')
+                                    const openButton = document.querySelector('#open-mobile-menu')
+
+                                    // On openButton click, set the mobileMenu position left to -100vw
+                                    openButton && openButton.addEventListener('click', function () {
+                                        mobileMenu.style.transform = 'translateX(0%)'
+                                    })
+
+                                    // On closeButton click, set the mobileMenu position to 0vw
+                                    closeButton && closeButton.addEventListener('click', function () {
+                                        mobileMenu.style.transform = 'translateX(100%)'
+                                    })
+                                }
+
+                                runMobileMenuCodeEmbed()
+                                listenForUrlChangesMobileMenu()
+                            </script>
+                        </div>
+                    </div>
+{% endblock %}
+
+{% block home_content %}
+            <link href="{{ url_for('static', filename='recommendations.css') }}" rel="stylesheet" />
+            <section class="home-section">
+                <div class="home-hero">
+                    <header class="home-header">
+                        <h1 class="home-heading1">Recommended Songs</h1>
+                        <a href="{{pl_url}}" target="_blank" rel="noreferrer noopener"
+                            class="home-heading2 nav-link">
+                            <h2 class="home-heading2">For playlist: {{pl_name}}</h2>
+                        </a>
+                    </header>
+                    <div class="home-list">
+                        {% for song in songs %}
+                        <div class="home-pl">
+                            <a href="https://open.spotify.com/track/{{ song['id'] }}" target="_blank" rel="noreferrer noopener"
+                                class="home-link nav-link"> 
+                                <span class="home-list-major">{{ song['name'] }} by {{ song['artists'][0]['name'] }}</span>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+{% endblock %}
