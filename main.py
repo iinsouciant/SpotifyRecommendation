@@ -531,7 +531,7 @@ def display_playlist_recommendations(username, pl_id:str, n:int = 10):
         # need to take care of case where the first 30 songs don't have lyrics
         i -= 1
         song:Song = selected_songs.pop()
-        if song.get_lyrics():
+        if song is not None and song.get_lyrics():
             print(f"Got lyrics for: ({song['name']}) by ({song['artists'][0]['name']})")
             try:
                 recommender.store_score(song['lyrics'])

@@ -14,6 +14,7 @@ type Row = tuple[str, str]
 type Lyrics = list[Row]
 type Song = Any
 
+# BUG: this shit keeps closing improperly or something else happens and so the data is not accessible. need to prevent this
 
 class LyricDB:
     def __init__(self, dbName: str = "lyrics.db") -> None:

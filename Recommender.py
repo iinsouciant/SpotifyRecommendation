@@ -28,11 +28,9 @@ class Recommender:
         # pretrained model to get embeddings
         self.model: SentenceTransformer = SentenceTransformer("all-MiniLM-L6-v2")
 
-        sleep(2)
         self.index: Index = self.get_index()
         self.recDF = self.df.copy()
         self.recDF["score"] = None
-
 
     def get_index(self) -> Index:
         if os.path.isfile(self.indexPath):
@@ -83,6 +81,7 @@ class Recommender:
         # take our input song lyrics and embed
         vec = self.model.encode(lyrics)
         # limit to k here to save computing power and discard low scores
+        # BUG this shit don't work
         ids, distances = self.index.query(vec, k)
         results = pd.DataFrame(
             [{"item_id": i, "score": d} for i, d in zip(ids, distances)]
