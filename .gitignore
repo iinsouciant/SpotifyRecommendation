@@ -3,4 +3,4 @@ examples/
 *.sql
 __pycache__
 recommendation.png
-*.db
+lyrics.db
